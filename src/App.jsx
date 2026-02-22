@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Dumbbell, Shield, Skull, Pizza, Trophy, Swords, Scroll, Crown, Briefcase, MessageSquare, User, Home, Plus, X, Calendar as CalIcon, Send, Menu } from 'lucide-react';
 
 // --- 1. IMPORT LOCAL ASSETS ---
-import kratosImg from './assets/kratos.png';
-import batmanImg from './assets/batman.png';
-import supermanImg from './assets/superman.png';
-import ironmanImg from './assets/ironman.png';
-import spidermanImg from './assets/spiderman.png';
-import vitoImg from './assets/vito.png';
-import michaelImg from './assets/michael.png';
-import tommyImg from './assets/tommy.png';
+import kratosImg from './assets/kratos-hero.png';
+import batmanImg from './assets/batman-hero.png';
+import supermanImg from './assets/superman-hero.png';
+import ironmanImg from './assets/ironman-hero.png';
+import spidermanImg from './assets/spiderman-hero.png';
+import vitoImg from './assets/vito-hero.png';
+import michaelImg from './assets/michael-hero.png';
+import tommyImg from './assets/tommy-hero.png';
 
 // --- 2. LORE DATA & AVATARS ---
 const HEROES = {
