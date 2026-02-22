@@ -274,13 +274,61 @@ const ChatTab = ({ user }) => {
     e.preventDefault();
     if (!input.trim()) return;
     
-    setMessages(prev => [...prev, { sender: 'user', text: input }]);
+    const userText = input;
     setInput('');
-    setMessages(prev => [...prev, { sender: 'ai', text: '...' }]);
+    
+    // 1. Add User Message and a "Loading" AI Message to the UI
+    setMessages(prev => [...prev, { sender: 'user', text: userText }, { sender: 'ai', text: '...' }]);
 
-    setTimeout(() => {
-      setMessages(prev => prev.slice(0, -1).concat({ sender: 'ai', text: `Connect the Groq API in the code to awaken my true consciousness.` }));
-    }, 1200);
+    try {
+      // 2. Build the Persona Prompt
+      const systemPrompt = `You are ${companion.name} from the ${user.franchise} universe. You are an AI companion for a fitness app. The user trains with brutal, high-intensity methodology. Keep your response to exactly one short, punchy, in-character sentence. Do not use emojis or hashtags.`;
+
+      // 3. Format the conversation history for the AI memory
+      const chatHistory = messages
+        .filter(m => m.text !== '...') // Remove loading dots
+        .map(m => ({
+          role: m.sender === 'user' ? 'user' : 'assistant',
+          content: m.text
+        }));
+
+      // 4. Fetch the response from Groq
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "llama3-8b-8192", // Fast open-source model
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...chatHistory,
+            { role: "user", content: userText }
+          ],
+          temperature: 0.7,
+          max_tokens: 100,
+        })
+      });
+
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      const aiResponse = data.choices[0].message.content.replace(/"/g, ''); // Clean up quotes
+
+      // 5. Replace the "Loading" message with the actual response
+      setMessages(prev => {
+        const newMsgs = [...prev];
+        newMsgs[newMsgs.length - 1] = { sender: 'ai', text: aiResponse };
+        return newMsgs;
+      });
+
+    } catch (error) {
+      setMessages(prev => {
+        const newMsgs = [...prev];
+        newMsgs[newMsgs.length - 1] = { sender: 'ai', text: "The comms channel is experiencing interference... check your API key." };
+        return newMsgs;
+      });
+    }
   };
 
   return (
