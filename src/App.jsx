@@ -1,32 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Dumbbell, Shield, Skull, Pizza, Trophy, Swords, Scroll, Crown, Briefcase, MessageSquare, User, Home, Plus, X, Calendar as CalIcon, Send, Loader2 } from 'lucide-react';
+import { Dumbbell, Shield, Skull, Pizza, Trophy, Swords, Scroll, Crown, Briefcase, MessageSquare, User, Home, Plus, X, Calendar as CalIcon, Send, Loader2, Sparkles } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
-// --- 0. INITIALIZE CLOUD CONNECTIONS ---
+// --- 0. CLOUD CONNECTIONS ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- 1. IMPORT LOCAL ASSETS ---
-import kratosImg from './assets/kratos-hero.png';
-import batmanImg from './assets/batman-hero.png';
-import supermanImg from './assets/superman-hero.png';
-import ironmanImg from './assets/ironman-hero.png';
-import spidermanImg from './assets/spiderman-hero.png';
-import vitoImg from './assets/vito-hero.png';
-import michaelImg from './assets/michael-hero.png';
-import tommyImg from './assets/tommy-hero.png';
-
-// --- 2. LORE DATA & AUDIO ENGINE ---
+// --- 1. LORE DATA & ASSETS ---
 const HEROES = {
-  Kratos: { franchise: 'God of War', image: kratosImg, glow: 'rgba(220,38,38,0.6)' }, 
-  Batman: { franchise: 'DC', image: batmanImg, glow: 'rgba(250,204,21,0.6)' }, 
-  Superman: { franchise: 'DC', image: supermanImg, glow: 'rgba(37,99,235,0.6)' }, 
-  IronMan: { franchise: 'Marvel', image: ironmanImg, glow: 'rgba(220,38,38,0.6)' }, 
-  SpiderMan: { franchise: 'Marvel', image: spidermanImg, glow: 'rgba(37,99,235,0.6)' },
-  Vito: { franchise: 'Godfather', image: vitoImg, glow: 'rgba(180,83,9,0.6)' }, 
-  Michael: { franchise: 'Godfather', image: michaelImg, glow: 'rgba(255,255,255,0.4)' },
-  Tommy: { franchise: 'Vice City', image: tommyImg, glow: 'rgba(236,72,153,0.6)' } 
+  Kratos: { franchise: 'God of War', image: 'https://cdn-icons-png.flaticon.com/512/3593/3593539.png', glow: 'rgba(220,38,38,0.6)' }, 
+  Batman: { franchise: 'DC', image: 'https://cdn-icons-png.flaticon.com/512/1007/1007004.png', glow: 'rgba(250,204,21,0.6)' }, 
+  Superman: { franchise: 'DC', image: 'https://cdn-icons-png.flaticon.com/512/805/805404.png', glow: 'rgba(37,99,235,0.6)' }, 
+  IronMan: { franchise: 'Marvel', image: 'https://cdn-icons-png.flaticon.com/512/1154/1154448.png', glow: 'rgba(220,38,38,0.6)' }, 
+  Vito: { franchise: 'Godfather', image: 'https://cdn-icons-png.flaticon.com/512/3067/3067302.png', glow: 'rgba(180,83,9,0.6)' }, 
+  Tommy: { franchise: 'Vice City', image: 'https://cdn-icons-png.flaticon.com/512/8221/8221151.png', glow: 'rgba(236,72,153,0.6)' },
+  Messi: { franchise: 'Football', image: 'https://cdn-icons-png.flaticon.com/512/5323/5323344.png', glow: 'rgba(56,189,248,0.8)' } // Lionel Messi Added
 };
 
 const COMPANIONS = {
@@ -34,54 +23,65 @@ const COMPANIONS = {
   'DC': { name: 'Alfred', icon: '🤵‍♂️', color: 'text-gray-300', bg: 'bg-gray-800/40', border: 'border-gray-500/50' },
   'Marvel': { name: 'Nick Fury', icon: '👁️‍🗨️', color: 'text-purple-400', bg: 'bg-purple-950/40', border: 'border-purple-500/50' },
   'Godfather': { name: 'Consigliere', icon: '💼', color: 'text-amber-500', bg: 'bg-amber-950/40', border: 'border-amber-700/50' },
-  'Vice City': { name: 'Ken Rosenberg', icon: '🌴', color: 'text-pink-400', bg: 'bg-pink-950/40', border: 'border-pink-500/50' }
+  'Vice City': { name: 'Ken Rosenberg', icon: '🌴', color: 'text-pink-400', bg: 'bg-pink-950/40', border: 'border-pink-500/50' },
+  'Football': { name: 'Lionel Scaloni', icon: '⚽', color: 'text-sky-400', bg: 'bg-sky-950/40', border: 'border-sky-500/50' }
 };
 
-const LOOT_ROADMAP = [ { level: 1, item: 'Innate Might (Fists)' }, { level: 5, item: 'Franchise Weapon' }, { level: 10, item: 'Divine Artifact' } ];
+const LOOT_ROADMAP = [ { level: 1, item: 'Innate Might' }, { level: 5, item: 'Franchise Weapon' }, { level: 10, item: 'Divine Artifact' } ];
 const LOOT_TABLE = {
-  'God of War': { 'bench press': 'Leviathan Axe', 'squat': 'Blades of Chaos', 'deadlift': 'Draupnir Spear' },
-  'DC': { 'bench press': 'Batarang Arsenal', 'squat': 'Kryptonite Ring', 'deadlift': 'Lasso of Truth' },
-  'Marvel': { 'bench press': 'Vibranium Shield', 'squat': 'Mjolnir', 'deadlift': 'Infinity Gauntlet' },
-  'Godfather': { 'bench press': 'Tommy Gun', 'squat': 'Bespoke Silk Suit', 'deadlift': 'The Don\'s Ring' },
-  'Vice City': { 'bench press': 'Machete', 'squat': 'Chainsaw', 'deadlift': 'Vercetti Estate Keys' }
+  'God of War': { 'bench': 'Leviathan Axe', 'squat': 'Blades of Chaos', 'deadlift': 'Draupnir Spear' },
+  'DC': { 'bench': 'Batarang Arsenal', 'squat': 'Kryptonite Ring', 'deadlift': 'Lasso of Truth' },
+  'Marvel': { 'bench': 'Vibranium Shield', 'squat': 'Mjolnir', 'deadlift': 'Infinity Gauntlet' },
+  'Godfather': { 'bench': 'Tommy Gun', 'squat': 'Bespoke Silk Suit', 'deadlift': 'The Don\'s Ring' },
+  'Vice City': { 'bench': 'Machete', 'squat': 'Chainsaw', 'deadlift': 'Vercetti Estate Keys' },
+  'Football': { 'bench': 'Golden Boot', 'squat': 'Ballon d\'Or', 'deadlift': 'World Cup Trophy' }
 };
 
 const playWorkoutFX = (franchise) => {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const osc = audioCtx.createOscillator();
-  const gainNode = audioCtx.createGain();
-  osc.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
 
-  if (franchise === 'Godfather' || franchise === 'Vice City') {
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(1500, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(3000, audioCtx.currentTime + 0.1);
-    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.15);
-  } else {
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.6);
-    gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.7);
-  }
+    if (franchise === 'Godfather' || franchise === 'Vice City') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(3000, audioCtx.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.15);
+    } else if (franchise === 'Football') {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.35);
+    } else {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.8);
+      gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.9);
+    }
+  } catch (e) { console.log("Audio blocked by browser."); }
 };
 
 const ImageAvatar = ({ heroName, size = 80 }) => {
   const hero = HEROES[heroName] || HEROES['Kratos'];
   return (
     <div className="animate-idle transition-transform duration-300 hover:scale-110 flex justify-center items-center" style={{ filter: `drop-shadow(0px 0px 15px ${hero.glow})` }}>
-      <img src={hero.image} alt={heroName} style={{ width: size, height: size, objectFit: 'contain' }} className="rounded-lg opacity-90" />
+      <img src={hero.image} alt={heroName} style={{ width: size, height: size, objectFit: 'contain' }} className="rounded-lg opacity-90 invert" />
     </div>
   );
 };
 
-// --- 3. CLOUD GAME ENGINE ---
+// --- 2. CLOUD GAME ENGINE & PERSISTENCE ---
 const useHero = () => {
   const [registry, setRegistry] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
@@ -92,10 +92,21 @@ const useHero = () => {
   const fetchLeaderboard = async () => {
     const { data } = await supabase.from('syndicate_registry').select('username, hero_data');
     if (data) setRegistry(data.map(d => ({ username: d.username, ...d.hero_data })));
-    setIsDbLoading(false);
   };
 
-  useEffect(() => { fetchLeaderboard(); }, []);
+  // CHECK LOCAL STORAGE ON MOUNT TO PREVENT LOGOUT
+  useEffect(() => {
+    const restoreSession = async () => {
+      const savedUser = localStorage.getItem('syndicate_active_user');
+      if (savedUser) {
+        const { data } = await supabase.from('syndicate_registry').select('*').eq('username', savedUser).single();
+        if (data) setCurrentUser({ username: data.username, ...data.hero_data });
+      }
+      await fetchLeaderboard();
+      setIsDbLoading(false);
+    };
+    restoreSession();
+  }, []);
 
   const triggerAiPopup = (franchise, message) => {
     setAiPopup({ franchise, message });
@@ -106,7 +117,9 @@ const useHero = () => {
     const { data, error } = await supabase.from('syndicate_registry').select('*').eq('username', username).single();
     if (error || !data) return { success: false, error: "Identity not found in the realm." };
     if (data.password !== password) return { success: false, error: "Incorrect passcode." };
+    
     setCurrentUser({ username: data.username, ...data.hero_data });
+    localStorage.setItem('syndicate_active_user', data.username); // SAVE SESSION
     return { success: true };
   };
 
@@ -119,6 +132,7 @@ const useHero = () => {
     if (error) return { success: false, error: "The database rejected your entry." };
     
     setCurrentUser({ username, ...newHeroData });
+    localStorage.setItem('syndicate_active_user', username); // SAVE SESSION
     fetchLeaderboard();
     return { success: true };
   };
@@ -144,10 +158,14 @@ const useHero = () => {
       if (ex.weight > prevWeight) {
         newPrs[ex.name] = ex.weight;
         const normalizedEx = ex.name.toLowerCase().trim();
-        const possibleItem = LOOT_TABLE[currentUser.franchise]?.[normalizedEx];
-        if (possibleItem && !newInventory.includes(possibleItem)) {
-          newInventory.push(possibleItem);
-          unlockedItems.push(possibleItem);
+        // Check if any word in their exercise matches a core lift
+        const matchedLift = Object.keys(LOOT_TABLE[currentUser.franchise]).find(key => normalizedEx.includes(key));
+        if (matchedLift) {
+          const possibleItem = LOOT_TABLE[currentUser.franchise][matchedLift];
+          if (possibleItem && !newInventory.includes(possibleItem)) {
+            newInventory.push(possibleItem);
+            unlockedItems.push(possibleItem);
+          }
         }
       }
     });
@@ -158,7 +176,6 @@ const useHero = () => {
     
     updateUserState({ xp: newXp, level: newLevel, prs: newPrs, inventory: newInventory, workouts: [newWorkoutLog, ...(currentUser.workouts || [])] });
     
-    // TRIGGER SCREEN SHAKE AND AUDIO
     playWorkoutFX(currentUser.franchise);
     setIsScreenShaking(true);
     setTimeout(() => setIsScreenShaking(false), 700);
@@ -175,12 +192,18 @@ const useHero = () => {
   };
 
   const updateBio = (newBio) => updateUserState({ bio: newBio });
-  return { currentUser, registry, isDbLoading, loginUser, registerUser, logFullWorkout, logMeal, updateBio, aiPopup, isScreenShaking };
+  
+  const logout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('syndicate_active_user'); // CLEAR SESSION
+  };
+
+  return { currentUser, registry, isDbLoading, loginUser, registerUser, logFullWorkout, logMeal, updateBio, aiPopup, isScreenShaking, logout };
 };
 
-// --- 4. UI COMPONENTS ---
+// --- 3. UI COMPONENTS ---
 
-const DashboardTab = ({ user, registry }) => {
+const DashboardTab = ({ user, registry, logout }) => {
   const today = new Date();
   const last14Days = Array.from({length: 14}).map((_, i) => {
     const d = new Date(today);
@@ -194,6 +217,7 @@ const DashboardTab = ({ user, registry }) => {
         <div>
           <h2 className="text-3xl md:text-5xl font-black uppercase text-white tracking-widest">{user.username}</h2>
           <p className="text-indigo-400 font-bold text-sm md:text-lg tracking-widest uppercase mt-2">Level {user.level} • {Math.floor(user.xp)} XP</p>
+          <button onClick={logout} className="mt-2 text-xs text-gray-500 hover:text-white uppercase tracking-widest">Logout</button>
         </div>
         <ImageAvatar heroName={user.heroName} size={80} />
       </div>
@@ -228,16 +252,47 @@ const DashboardTab = ({ user, registry }) => {
   );
 };
 
+// --- NEW AI FOOD TAB ---
 const FoodTab = ({ user, logMeal }) => {
   const [food, setFood] = useState('');
   const [protein, setProtein] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const estimateMacrosWithAI = async () => {
+    if (!food.trim()) return;
+    setIsAiLoading(true);
+    try {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          model: "llama-3.1-8b-instant", 
+          messages: [{ role: "system", content: "You are a macro calculator. The user will give you a food. Estimate the grams of protein. Reply with ONLY a number. No text, no symbols." }, { role: "user", content: food }], 
+          temperature: 0.1, max_tokens: 10 
+        })
+      });
+      const data = await response.json();
+      const aiProtein = parseInt(data.choices[0].message.content.replace(/[^0-9]/g, ''));
+      if (!isNaN(aiProtein)) setProtein(aiProtein);
+    } catch (err) { console.error("AI Macro fail", err); }
+    setIsAiLoading(false);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-24 pt-4 md:pb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="glass-card p-6 md:p-8 border-emerald-500/20">
           <h2 className="text-xl font-bold uppercase text-emerald-400 mb-6 flex items-center gap-2 tracking-widest border-b border-emerald-500/20 pb-2"><Pizza size={20}/> Fuel the Engine</h2>
           <form onSubmit={(e) => { e.preventDefault(); logMeal(food, protein, false); setFood(''); setProtein(''); }} className="space-y-4">
-            <div><label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Ration Description</label><input placeholder="E.g. Chicken Smash Burger" required value={food} onChange={e=>setFood(e.target.value)} className="w-full bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" /></div>
+            <div>
+              <label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Ration Description</label>
+              <div className="flex gap-2">
+                <input placeholder="E.g. Chicken Smash Burger" required value={food} onChange={e=>setFood(e.target.value)} className="flex-1 bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" />
+                <button type="button" onClick={estimateMacrosWithAI} disabled={isAiLoading || !food} className="bg-emerald-900/40 border border-emerald-500/30 text-emerald-400 p-4 rounded hover:bg-emerald-800/50 transition flex items-center justify-center disabled:opacity-50">
+                  {isAiLoading ? <Loader2 className="animate-spin" size={20}/> : <Sparkles size={20}/>}
+                </button>
+              </div>
+            </div>
             <div><label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Protein Content</label><input type="number" placeholder="Protein (g)" required value={protein} onChange={e=>setProtein(e.target.value)} className="w-full bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" /></div>
             <button type="submit" className="w-full py-4 mt-4 bg-emerald-700 hover:bg-emerald-600 font-black uppercase tracking-widest rounded text-white transition shadow-[0_0_15px_rgba(16,185,129,0.3)]">Log Nutrition</button>
           </form>
@@ -313,28 +368,16 @@ const ChatTab = ({ user }) => {
 
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
-          "Content-Type": "application/json"
-        },
+        headers: { "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], temperature: 0.7, max_tokens: 100 })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || `HTTP Status ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`HTTP Status ${response.status}`);
       const data = await response.json();
       const aiResponse = data.choices[0].message.content.replace(/"/g, ''); 
-
       setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: aiResponse }; return newMsgs; });
     } catch (error) {
-      setMessages(prev => { 
-        const newMsgs = [...prev]; 
-        newMsgs[newMsgs.length - 1] = { sender: 'ai', text: `ERROR: ${error.message}. (If you see "Network Error" or 401, Vercel is blocking your key. Check your Vercel settings and redeploy).` }; 
-        return newMsgs; 
-      });
+      setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: `ERROR: ${error.message}.` }; return newMsgs; });
     }
   };
 
@@ -364,59 +407,31 @@ const ChatTab = ({ user }) => {
 const WorkoutModal = ({ isOpen, onClose, logWorkout }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [split, setSplit] = useState('Blood & Guts (HIT)');
-  // Add bodyPart to the initial state
   const [exercises, setExercises] = useState([{ bodyPart: 'Chest', name: '', weight: '', reps: '', sets: '' }]);
 
   if (!isOpen) return null;
 
-  const handleUpdateRow = (index, field, value) => { 
-    const newEx = [...exercises]; 
-    newEx[index] = { ...newEx[index], [field]: value }; 
-    setExercises(newEx); 
-  };
-  
-  const handleSubmit = (e) => { 
-    e.preventDefault(); 
-    logWorkout(date, split, exercises); 
-    onClose(); 
-    setExercises([{ bodyPart: 'Chest', name: '', weight: '', reps: '', sets: '' }]); 
-  };
+  const handleUpdateRow = (index, field, value) => { const newEx = [...exercises]; newEx[index] = { ...newEx[index], [field]: value }; setExercises(newEx); };
+  const handleSubmit = (e) => { e.preventDefault(); logWorkout(date, split, exercises); onClose(); setExercises([{ bodyPart: 'Chest', name: '', weight: '', reps: '', sets: '' }]); };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-fade-in">
       <div className="bg-[#0f0f0f] border border-indigo-500/30 w-full max-w-lg md:max-w-2xl rounded-xl shadow-[0_0_40px_rgba(79,70,229,0.2)] overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-6 border-b border-white/10 bg-black/50"><h2 className="text-xl md:text-2xl font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2"><Dumbbell size={24}/> Log Conquest</h2><button onClick={onClose} className="text-gray-400 hover:text-white transition"><X size={28}/></button></div>
-        
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 hide-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Date</label><input type="date" required value={date} onChange={(e)=>setDate(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition" /></div>
             <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Split</label><select value={split} onChange={(e)=>setSplit(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition"><option>Blood & Guts (HIT)</option><option>Push/Pull/Legs</option><option>Upper/Lower</option><option>Full Body</option></select></div>
           </div>
-          
           <div className="space-y-4">
             <label className="text-xs text-gray-400 uppercase tracking-widest block">Movements</label>
             {exercises.map((ex, i) => (
               <div key={i} className="flex flex-col gap-3 bg-black/30 border border-white/5 p-4 rounded-xl">
-                
-                {/* TOP ROW: Muscle Group and Exercise Name */}
                 <div className="flex flex-col md:flex-row gap-3">
-                  <select value={ex.bodyPart} onChange={(e)=>handleUpdateRow(i, 'bodyPart', e.target.value)} className="w-full md:w-1/3 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition">
-                    <option value="Chest">Chest</option>
-                    <option value="Back">Back</option>
-                    <option value="Legs">Legs</option>
-                    <option value="Shoulders">Shoulders</option>
-                    <option value="Arms">Arms</option>
-                    <option value="Core">Core</option>
-                  </select>
-                  <input placeholder="Exercise Name (e.g., Incline Press)" required value={ex.name} onChange={(e)=>handleUpdateRow(i, 'name', e.target.value)} className="w-full md:w-2/3 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
+                  <select value={ex.bodyPart} onChange={(e)=>handleUpdateRow(i, 'bodyPart', e.target.value)} className="w-full md:w-1/3 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition"><option value="Chest">Chest</option><option value="Back">Back</option><option value="Legs">Legs</option><option value="Shoulders">Shoulders</option><option value="Arms">Arms</option><option value="Core">Core</option></select>
+                  <input placeholder="Exercise (e.g., Incline Press)" required value={ex.name} onChange={(e)=>handleUpdateRow(i, 'name', e.target.value)} className="w-full md:w-2/3 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
                 </div>
-                
-                {/* BOTTOM ROW: Weight, Reps, Sets */}
-                <div className="flex gap-3">
-                  <input type="number" placeholder="Kg" required value={ex.weight} onChange={(e)=>handleUpdateRow(i, 'weight', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
-                  <input type="number" placeholder="Reps" required value={ex.reps} onChange={(e)=>handleUpdateRow(i, 'reps', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
-                  <input type="number" placeholder="Sets" required value={ex.sets} onChange={(e)=>handleUpdateRow(i, 'sets', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
-                </div>
+                <div className="flex gap-3"><input type="number" placeholder="Kg" required value={ex.weight} onChange={(e)=>handleUpdateRow(i, 'weight', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" /><input type="number" placeholder="Reps" required value={ex.reps} onChange={(e)=>handleUpdateRow(i, 'reps', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" /><input type="number" placeholder="Sets" required value={ex.sets} onChange={(e)=>handleUpdateRow(i, 'sets', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" /></div>
               </div>
             ))}
             <button type="button" onClick={()=>setExercises([...exercises, { bodyPart: 'Chest', name: '', weight: '', reps: '', sets: '' }])} className="text-sm font-bold uppercase tracking-widest text-indigo-400 flex items-center justify-center gap-2 hover:text-indigo-300 mt-2 bg-indigo-900/30 w-full px-6 py-4 rounded-xl transition border border-indigo-500/20"><Plus size={18}/> Add Movement</button>
@@ -428,7 +443,13 @@ const WorkoutModal = ({ isOpen, onClose, logWorkout }) => {
   );
 };
 
-// --- 5. AUTHENTICATION UI ---
+// --- 4. DYNAMIC THEMED LOGIN ---
+const LOGIN_THEMES = [
+  { name: 'D&D', bgClass: 'bg-[#050505] bg-[url("https://www.transparenttextures.com/patterns/dark-leather.png")]', cardBg: 'bg-[#0a0503]/95 border-amber-900/50', textAccent: 'text-amber-500', icon: <Scroll size={56} className="mx-auto text-amber-600 mb-6 drop-shadow-[0_0_10px_rgba(217,119,6,0.8)]" />, btnClass: 'bg-gradient-to-r from-amber-800 to-amber-600 text-black shadow-[0_0_15px_rgba(217,119,6,0.4)] hover:from-amber-700 hover:to-amber-500' },
+  { name: 'Gotham', bgClass: 'bg-zinc-950 bg-[url("https://www.transparenttextures.com/patterns/concrete-wall.png")]', cardBg: 'bg-zinc-900/95 border-blue-900/50', textAccent: 'text-blue-500', icon: <Shield size={56} className="mx-auto text-blue-600 mb-6 drop-shadow-[0_0_10px_rgba(37,99,235,0.8)]" />, btnClass: 'bg-gradient-to-r from-blue-900 to-blue-700 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] hover:from-blue-800 hover:to-blue-600' },
+  { name: 'Tron', bgClass: 'bg-black bg-[url("https://www.transparenttextures.com/patterns/cubes.png")]', cardBg: 'bg-black border-cyan-500/80 shadow-[0_0_30px_rgba(6,182,212,0.3)]', textAccent: 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]', icon: <Swords size={56} className="mx-auto text-cyan-400 mb-6 drop-shadow-[0_0_15px_rgba(6,182,212,1)]" />, btnClass: 'bg-transparent border-2 border-cyan-500 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.5)] hover:bg-cyan-950' }
+];
+
 const DndLogin = ({ engine }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
@@ -436,49 +457,49 @@ const DndLogin = ({ engine }) => {
   const [heroName, setHeroName] = useState('Vito');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Pick random theme on load
+  const [theme] = useState(LOGIN_THEMES[Math.floor(Math.random() * LOGIN_THEMES.length)]);
 
   const handleAuth = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
+    setIsLoading(true); setError('');
     let res = isRegistering ? await engine.registerUser(username, password, heroName, HEROES[heroName].franchise) : await engine.loginUser(username, password);
     if (!res.success) setError(res.error);
     setIsLoading(false);
   };
 
-  if (engine.isDbLoading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="animate-spin text-amber-500" size={48} /></div>;
+  if (engine.isDbLoading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" size={48} /></div>;
 
   return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 bg-[url('https://www.transparenttextures.com/patterns/dark-leather.png')]">
-      <div className="border border-amber-900/50 bg-[#0a0503]/95 backdrop-blur-md p-8 md:p-12 w-full max-w-md md:max-w-lg text-center shadow-[0_0_40px_rgba(180,83,9,0.15)] rounded-2xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-600 to-transparent"></div>
-        <Scroll size={56} className="mx-auto text-amber-600 mb-6 drop-shadow-[0_0_10px_rgba(217,119,6,0.8)]" />
-        <h1 className="text-3xl md:text-4xl font-black uppercase tracking-widest text-amber-500 mb-2 font-serif">The Syndicate</h1>
-        <p className="text-amber-900/80 font-serif italic mb-8 md:text-lg">Swear your blood oath.</p>
+    <div className={`min-h-screen flex items-center justify-center p-4 transition-colors ${theme.bgClass}`}>
+      <div className={`border backdrop-blur-md p-8 md:p-12 w-full max-w-md md:max-w-lg text-center rounded-2xl relative overflow-hidden ${theme.cardBg}`}>
+        {theme.icon}
+        <h1 className={`text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 font-serif ${theme.textAccent}`}>The Syndicate</h1>
+        <p className="text-gray-400 font-serif italic mb-8 md:text-lg">Swear your blood oath.</p>
         {error && <p className="text-red-500 text-sm mb-4 font-bold animate-pulse">{error}</p>}
         <form onSubmit={handleAuth} className="space-y-4">
-          <input type="text" required placeholder="Alias (Username)" className="w-full bg-black/60 border border-amber-900/50 p-4 text-amber-100 rounded-lg outline-none focus:border-amber-500 transition" onChange={(e) => setUsername(e.target.value)} />
-          <input type="password" required placeholder="Passcode" className="w-full bg-black/60 border border-amber-900/50 p-4 text-amber-100 rounded-lg outline-none focus:border-amber-500 transition" onChange={(e) => setPassword(e.target.value)} />
+          <input type="text" required placeholder="Alias (Username)" className="w-full bg-black/60 border border-white/10 p-4 text-white rounded-lg outline-none focus:border-white/40 transition" onChange={(e) => setUsername(e.target.value)} />
+          <input type="password" required placeholder="Passcode" className="w-full bg-black/60 border border-white/10 p-4 text-white rounded-lg outline-none focus:border-white/40 transition" onChange={(e) => setPassword(e.target.value)} />
           {isRegistering && (
             <div className="pt-4 text-left">
-              <label className="block text-amber-700 text-xs font-black uppercase tracking-widest mb-3">Select Identity</label>
-              <select className="w-full bg-black/60 border border-amber-900/50 p-4 text-amber-100 rounded-lg outline-none focus:border-amber-500 transition appearance-none" onChange={(e) => setHeroName(e.target.value)} value={heroName}>
+              <label className={`block text-xs font-black uppercase tracking-widest mb-3 ${theme.textAccent}`}>Select Identity</label>
+              <select className="w-full bg-black/60 border border-white/10 p-4 text-white rounded-lg outline-none transition appearance-none" onChange={(e) => setHeroName(e.target.value)} value={heroName}>
                 {Object.keys(HEROES).map(name => <option key={name} value={name}>{name} ({HEROES[name].franchise})</option>)}
               </select>
-              <div className="flex justify-center mt-6 p-6 border border-amber-900/30 bg-black/40 rounded-xl"><ImageAvatar heroName={heroName} size={100} /></div>
             </div>
           )}
-          <button type="submit" disabled={isLoading} className="w-full py-4 mt-6 bg-gradient-to-r from-amber-800 to-amber-600 text-black font-black uppercase tracking-widest hover:from-amber-700 hover:to-amber-500 transition rounded-lg shadow-[0_0_15px_rgba(217,119,6,0.4)] md:text-lg flex justify-center items-center gap-2 disabled:opacity-50">
+          <button type="submit" disabled={isLoading} className={`w-full py-4 mt-6 font-black uppercase tracking-widest transition rounded-lg md:text-lg flex justify-center items-center gap-2 disabled:opacity-50 ${theme.btnClass}`}>
             {isLoading ? <Loader2 className="animate-spin" size={20}/> : (isRegistering ? 'Forge Legacy' : 'Enter Realm')}
           </button>
         </form>
-        <button onClick={() => { setIsRegistering(!isRegistering); setError(''); }} className="mt-8 text-amber-700 hover:text-amber-500 text-sm underline font-serif transition">{isRegistering ? 'Already in the family? Login.' : 'New to town? Register.'}</button>
+        <button onClick={() => { setIsRegistering(!isRegistering); setError(''); }} className="mt-8 text-gray-500 hover:text-gray-300 text-sm underline font-serif transition">{isRegistering ? 'Already in the family? Login.' : 'New to town? Register.'}</button>
       </div>
     </div>
   );
 };
 
-// --- 6. ROOT APP ---
+// --- 5. ROOT APP ---
 export default function App() {
   const engine = useHero();
   const [activeTab, setActiveTab] = useState('home');
@@ -499,18 +520,15 @@ export default function App() {
         
         @keyframes rage { 
           0%, 100% { transform: translate(0, 0) scale(1); } 
-          10%, 30%, 50%, 70%, 90% { transform: translate(-8px, 8px) scale(1.02); } 
-          20%, 40%, 60%, 80% { transform: translate(8px, -8px) scale(1.02); } 
+          10%, 30%, 50%, 70%, 90% { transform: translate(-12px, 12px) scale(1.05); } 
+          20%, 40%, 60%, 80% { transform: translate(12px, -12px) scale(1.05); } 
         } 
-        .animate-rage { animation: rage 0.6s cubic-bezier(.36,.07,.19,.97) both; }
+        .animate-rage { animation: rage 0.7s cubic-bezier(.36,.07,.19,.97) both; }
         @keyframes flash { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
-        .animate-flash { animation: flash 0.6s ease-in-out; }
+        .animate-flash { animation: flash 0.7s ease-in-out; }
       `}</style>
 
-      {/* FULL SCREEN BLOOD RED FLASH OVERLAY */}
-      {engine.isScreenShaking && (
-        <div className="fixed inset-0 bg-red-600/40 mix-blend-overlay z-[100] pointer-events-none animate-flash"></div>
-      )}
+      {engine.isScreenShaking && <div className="fixed inset-0 bg-red-600/50 mix-blend-overlay z-[100] pointer-events-none animate-flash"></div>}
 
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col w-64 border-r border-white/10 bg-[#0a0a0a] z-40 p-4">
@@ -527,14 +545,13 @@ export default function App() {
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 relative overflow-y-auto hide-scrollbar z-10">
         <div className="w-full max-w-md md:max-w-6xl mx-auto h-full px-4 md:px-8 py-4 md:py-8">
-          {activeTab === 'home' && <DashboardTab user={engine.currentUser} registry={engine.registry} />}
+          {activeTab === 'home' && <DashboardTab user={engine.currentUser} registry={engine.registry} logout={engine.logout} />}
           {activeTab === 'food' && <FoodTab user={engine.currentUser} logMeal={engine.logMeal} />}
           {activeTab === 'chat' && <ChatTab user={engine.currentUser} />}
           {activeTab === 'profile' && <ProfileTab user={engine.currentUser} updateBio={engine.updateBio} />}
         </div>
       </main>
 
-      {/* GLOBAL NOTIFICATIONS */}
       {engine.aiPopup && (
         <div className="fixed top-6 left-1/2 z-50 animate-slide-down w-[90%] max-w-sm md:max-w-md"><div className="p-4 md:p-6 border border-indigo-500/50 bg-indigo-950/95 backdrop-blur-xl shadow-[0_0_40px_rgba(79,70,229,0.5)] flex items-center gap-4 rounded-2xl"><span className="text-3xl md:text-4xl drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">✨</span><p className="text-indigo-100 font-serif italic text-sm md:text-base">"{engine.aiPopup.message}"</p></div></div>
       )}
