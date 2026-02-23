@@ -317,7 +317,12 @@ const ChatTab = ({ user }) => {
           "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ model: "llama3-8b-8192", messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], temperature: 0.7, max_tokens: 100 })
+        body: JSON.stringify({ 
+          model: "llama-3.1-8b-instant", // <--- CHANGE THIS EXACT LINE
+          messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], 
+          temperature: 0.7, 
+          max_tokens: 100 
+        })
       });
 
       if (!response.ok) {
