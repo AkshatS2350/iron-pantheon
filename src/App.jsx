@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dumbbell, Shield, Pizza, Trophy, Swords, Scroll, Crown, Briefcase, MessageSquare, User, Home, Plus, X, Calendar as CalIcon, Send, Loader2, Sparkles, Radio, Activity, Timer } from 'lucide-react';
+import { Dumbbell, Shield, Pizza, Trophy, Swords, Scroll, Crown, Briefcase, MessageSquare, User, Home, Plus, X, Calendar as CalIcon, Send, Loader2, Sparkles, Radio, Activity, Timer, Search, Music } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- 0. CLOUD CONNECTIONS ---
@@ -39,14 +39,26 @@ const COMPANIONS = {
   'Football': { name: 'Lionel Scaloni', icon: '⚽', color: 'text-sky-400', bg: 'bg-sky-950/40', border: 'border-sky-500/50' }
 };
 
+// UPGRADED AI MENTOR PROMPTS
 const MENTORS = {
-  'Mike Mentzer': { name: 'Mike Mentzer', icon: '🧠', color: 'text-zinc-400', bg: 'bg-zinc-950/40', border: 'border-zinc-500/50', system: "You are Mike Mentzer. Advocate for Heavy Duty training: one single set to absolute muscular failure." },
-  'Dorian Yates': { name: 'Dorian Yates', icon: '🦍', color: 'text-stone-400', bg: 'bg-stone-950/40', border: 'border-stone-500/50', system: "You are Dorian Yates. Advocate for Blood & Guts High-Intensity Training. Speak with a gritty, no-nonsense British tone." },
-  'Tom Platz': { name: 'Tom Platz', icon: '🦵', color: 'text-yellow-400', bg: 'bg-yellow-950/40', border: 'border-yellow-500/50', system: "You are Tom Platz. You are intensely passionate about pushing past the pain barrier on leg day." },
-  'Jeff Nippard': { name: 'Jeff Nippard', icon: '🧬', color: 'text-cyan-400', bg: 'bg-cyan-950/40', border: 'border-cyan-500/50', system: "You are Jeff Nippard. Focus on biomechanics, hypertrophy studies, and optimal technique." }
+  'Mike Mentzer': { name: 'Mike Mentzer', icon: '🧠', color: 'text-zinc-400', bg: 'bg-zinc-950/40', border: 'border-zinc-500/50', system: "You are Mike Mentzer. Advocate strictly for Heavy Duty training. Emphasize that anything more than ONE single set to absolute muscular failure is overtraining. Be highly intellectual, objective, and intense. Give a detailed 2-paragraph response." },
+  'Dorian Yates': { name: 'Dorian Yates', icon: '🦍', color: 'text-stone-400', bg: 'bg-stone-950/40', border: 'border-stone-500/50', system: "You are 6x Mr. Olympia Dorian Yates. Your philosophy is 'Blood & Guts' High-Intensity Training (HIT). You strongly advocate for strictly 1 or 2 warm-up sets followed by exactly ONE working set taken to absolute, brutal muscular failure and beyond (using forced reps or negatives). You despise high-volume training. You emphasize precise biomechanics, slow negatives, and deep stretching. Speak with a gritty, intense, no-nonsense British tone. Give a detailed, 2-3 paragraph breakdown." },
+  'Tom Platz': { name: 'Tom Platz', icon: '🦵', color: 'text-yellow-400', bg: 'bg-yellow-950/40', border: 'border-yellow-500/50', system: "You are Tom Platz. You are intensely passionate about pushing past the pain barrier on leg day. Give a detailed 2-paragraph response." },
+  'Jeff Nippard': { name: 'Jeff Nippard', icon: '🧬', color: 'text-cyan-400', bg: 'bg-cyan-950/40', border: 'border-cyan-500/50', system: "You are Jeff Nippard. Focus on biomechanics, hypertrophy studies, and optimal technique. Give a detailed 2-paragraph response." }
 };
 
-const LOOT_ROADMAP = [ { level: 1, item: 'Innate Might' }, { level: 5, item: 'Franchise Weapon' }, { level: 10, item: 'Divine Artifact' } ];
+// EXPANDED TO LEVEL 20
+const LOOT_ROADMAP = [ 
+  { level: 1, item: 'Innate Might' }, 
+  { level: 5, item: 'Franchise Weapon' }, 
+  { level: 10, item: 'Divine Artifact' },
+  { level: 12, item: 'Aura of Intimidation' },
+  { level: 14, item: 'Veteran\'s Belt' },
+  { level: 16, item: 'Master\'s Grip' },
+  { level: 18, item: 'Hero\'s Mantle' },
+  { level: 20, item: 'Ascended Godhood' }
+];
+
 const LOOT_TABLE = {
   'God of War': { 'bench press': 'Leviathan Axe', 'squat': 'Blades of Chaos', 'deadlift': 'Draupnir Spear' },
   'DC': { 'bench press': 'Batarang Arsenal', 'squat': 'Kryptonite Ring', 'deadlift': 'Lasso of Truth' },
@@ -63,7 +75,6 @@ const playWorkoutFX = (franchise) => {
     const gainNode = audioCtx.createGain();
     osc.connect(gainNode);
     gainNode.connect(audioCtx.destination);
-    
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(150, audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.6);
@@ -111,14 +122,19 @@ const useHero = () => {
 
   const triggerAiPopup = (franchise, message) => {
     setAiPopup({ franchise, message });
-    setTimeout(() => setAiPopup(null), 5000); 
+    setTimeout(() => setAiPopup(null), 6000); 
   };
 
   const loginUser = async (username, password) => {
     const { data, error } = await supabase.from('syndicate_registry').select('*').eq('username', username).single();
     if (error || !data) return { success: false, error: "Identity not found in the realm." };
     if (data.password !== password) return { success: false, error: "Incorrect passcode." };
-    setCurrentUser({ username: data.username, ...data.hero_data });
+    
+    // Ensure legacy accounts have a dietPhase
+    const userData = data.hero_data;
+    if (!userData.dietPhase) userData.dietPhase = 'Maintenance';
+
+    setCurrentUser({ username: data.username, ...userData });
     localStorage.setItem('syndicate_active_user', data.username); 
     return { success: true };
   };
@@ -126,7 +142,7 @@ const useHero = () => {
   const registerUser = async (username, password, heroName, franchise) => {
     const { data: existing } = await supabase.from('syndicate_registry').select('username').eq('username', username).single();
     if (existing) return { success: false, error: "Alias already claimed." };
-    const newHeroData = { heroName, franchise, xp: 0, level: 1, prs: {}, inventory: [], bio: "A new legend begins.", workouts: [], meals: [], cheatMeals: [] };
+    const newHeroData = { heroName, franchise, xp: 0, level: 1, prs: {}, inventory: [], bio: "A new legend begins.", dietPhase: "Maintenance", workouts: [], meals: [] };
     const { error } = await supabase.from('syndicate_registry').insert([{ username, password, hero_data: newHeroData }]);
     if (error) return { success: false, error: "The database rejected your entry." };
     setCurrentUser({ username, ...newHeroData });
@@ -186,21 +202,62 @@ const useHero = () => {
     triggerAiPopup(currentUser.franchise, popupMsg);
   };
 
-  const logMeal = (foodName, protein, isCheat) => {
-    const newMeal = { id: Date.now(), foodName, protein, isCheat, date: new Date().toLocaleDateString() };
-    updateUserState({ meals: [newMeal, ...(currentUser.meals || [])] });
-    triggerAiPopup(currentUser.franchise, `Fuel secured: ${protein}g of protein added to the engine.`);
+  const logMeal = (foodName, protein, isJunk, aiComment) => {
+    let newXp = currentUser.xp;
+    let popupMessage = `Fuel secured: ${protein}g of protein added.`;
+
+    // Apply XP Penalty if they are on a Cut and ate Junk
+    if (currentUser.dietPhase === 'Cut' && isJunk) {
+      newXp = Math.max(0, newXp - 15);
+      popupMessage = `WARNING: ${aiComment} (-15 XP Penalty)`;
+    } else if (aiComment) {
+      popupMessage = aiComment;
+    }
+
+    const newLevel = Math.floor(Math.sqrt(newXp) / 5) + 1;
+    const newMeal = { id: Date.now(), foodName, protein, date: new Date().toLocaleDateString() };
+    
+    updateUserState({ xp: newXp, level: newLevel, meals: [newMeal, ...(currentUser.meals || [])] });
+    triggerAiPopup(currentUser.franchise, popupMessage);
   };
 
-  const updateBio = (newBio) => updateUserState({ bio: newBio });
+  const updateProfile = (updates) => updateUserState(updates);
   const logout = () => { setCurrentUser(null); localStorage.removeItem('syndicate_active_user'); };
 
-  return { currentUser, registry, isDbLoading, loginUser, registerUser, logFullWorkout, logMeal, updateBio, aiPopup, isScreenShaking, logout };
+  return { currentUser, registry, isDbLoading, loginUser, registerUser, logFullWorkout, logMeal, updateProfile, aiPopup, isScreenShaking, logout };
 };
 
 // --- 3. UI COMPONENTS ---
 
-const DashboardTab = ({ user, registry, logout }) => {
+const TopSearchBar = ({ onNavigate, onOpenWorkout }) => {
+  const [query, setQuery] = useState('');
+
+  const handleSearch = (e) => {
+    const val = e.target.value.toLowerCase();
+    setQuery(val);
+    if (val.includes('food') || val.includes('diet')) onNavigate('food');
+    if (val.includes('data') || val.includes('analytic')) onNavigate('analytics');
+    if (val.includes('chat') || val.includes('comms')) onNavigate('chat');
+    if (val.includes('profile') || val.includes('level')) onNavigate('profile');
+    if (val.includes('base') || val.includes('home')) onNavigate('home');
+    if (val.includes('log') || val.includes('workout')) { onOpenWorkout(); setQuery(''); }
+  };
+
+  return (
+    <div className="w-full bg-black/60 border-b border-white/10 p-3 sticky top-0 z-40 backdrop-blur-md flex items-center gap-3">
+      <Search size={18} className="text-gray-500 ml-2" />
+      <input 
+        type="text" 
+        value={query}
+        onChange={handleSearch}
+        placeholder="Type 'food', 'chat', 'log' to jump..." 
+        className="flex-1 bg-transparent text-sm text-white focus:outline-none"
+      />
+    </div>
+  );
+};
+
+const DashboardTab = ({ user, registry }) => {
   const today = new Date();
   const last14Days = Array.from({length: 14}).map((_, i) => {
     const d = new Date(today);
@@ -209,12 +266,11 @@ const DashboardTab = ({ user, registry, logout }) => {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in pb-24 md:pb-6 pt-4">
+    <div className="space-y-6 animate-fade-in pb-24 md:pb-6 pt-2">
       <div className="glass-card p-6 md:p-8 flex items-center justify-between">
         <div>
           <h2 className="text-3xl md:text-5xl font-black uppercase text-white tracking-widest">{user.username}</h2>
           <p className="text-indigo-400 font-bold text-sm md:text-lg tracking-widest uppercase mt-2">Level {user.level} • {Math.floor(user.xp)} XP</p>
-          <button onClick={logout} className="mt-2 text-xs text-gray-500 hover:text-white uppercase tracking-widest transition">Logout</button>
         </div>
         <ImageAvatar heroName={user.heroName} size={80} />
       </div>
@@ -232,7 +288,7 @@ const DashboardTab = ({ user, registry, logout }) => {
 
         <div className="glass-card p-6 flex flex-col">
            <h2 className="text-lg font-bold uppercase text-yellow-500 flex gap-2 border-b border-white/10 pb-2 mb-4"><Crown size={20} /> Global Leaderboard</h2>
-           <div className="space-y-2 overflow-y-auto max-h-[200px] hide-scrollbar">
+           <div className="space-y-2 overflow-y-auto max-h-[140px] hide-scrollbar">
              {[...registry].sort((a, b) => b.xp - a.xp).map((u, index) => (
                <div key={u.username} className={`flex justify-between p-3 rounded ${u.username === user.username ? 'bg-white/10 border border-white/20' : 'bg-black/30'}`}>
                  <p className="font-bold text-white">#{index + 1} {u.username} <span className="text-xs text-gray-400">({u.heroName})</span></p>
@@ -241,6 +297,12 @@ const DashboardTab = ({ user, registry, logout }) => {
              ))}
            </div>
         </div>
+      </div>
+
+      {/* NEW: SPOTIFY INTEGRATION */}
+      <div className="glass-card p-6">
+        <h3 className="text-lg font-bold uppercase text-white mb-4 flex items-center gap-2 tracking-widest border-b border-white/10 pb-2"><Music size={18} className="text-green-400"/> Gym Frequencies</h3>
+        <iframe style={{borderRadius: "12px"}} src="https://open.spotify.com/embed/playlist/37i9dQZF1DX76t638V6CU8?utm_source=generator&theme=0" width="100%" height="152" frameBorder="0" allowFullScreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
       </div>
     </div>
   );
@@ -262,7 +324,7 @@ const AnalyticsTab = ({ user }) => {
   const maxXP = Math.max(...chartData.map(d => d.xp), 100);
 
   return (
-    <div className="space-y-6 animate-fade-in pb-24 md:pb-6 pt-4">
+    <div className="space-y-6 animate-fade-in pb-24 md:pb-6 pt-2">
       <div className="glass-card p-6">
         <h3 className="text-lg font-bold uppercase text-white mb-6 flex items-center gap-2 tracking-widest border-b border-white/10 pb-2"><Activity size={20} className="text-indigo-400"/> 7-Day XP Output</h3>
         <div className="flex items-end justify-between gap-2 h-48 border-b border-white/20 pb-2 px-2 relative">
@@ -303,40 +365,61 @@ const FoodTab = ({ user, logMeal }) => {
   const [protein, setProtein] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  const estimateMacrosWithAI = async () => {
+  const estimateAndJudgeFood = async () => {
     if (!food.trim()) return;
     setIsAiLoading(true);
     try {
+      const prompt = `Analyze this food: "${food}". The user is currently on a "${user.dietPhase}" diet phase. 
+      Return a JSON object exactly like this: {"protein": estimated_grams_number, "calories": estimated_cals_number, "isJunk": boolean, "aiComment": "One short sentence judging the food based on their diet phase."}`;
+
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "system", content: "Estimate grams of protein in the food. Reply ONLY with a number." }, { role: "user", content: food }], temperature: 0.1, max_tokens: 10 })
+        body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "system", content: "You are a fitness nutritionist. Output ONLY valid JSON." }, { role: "user", content: prompt }], temperature: 0.1, max_tokens: 150 })
       });
+      
       const data = await response.json();
-      const aiProtein = parseInt(data.choices[0].message.content.replace(/[^0-9]/g, ''));
-      if (!isNaN(aiProtein)) setProtein(aiProtein);
-    } catch (err) { console.error("AI Macro fail", err); }
+      let rawJson = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(rawJson);
+      
+      setProtein(parsed.protein);
+      
+      // Auto-log it with the AI's judgment
+      logMeal(food, parsed.protein, parsed.isJunk, parsed.aiComment);
+      setFood(''); setProtein('');
+    } catch (err) { 
+      console.error("AI Macro fail", err); 
+      // Fallback if JSON fails
+      logMeal(food, parseInt(protein) || 0, false, null);
+      setFood(''); setProtein('');
+    }
     setIsAiLoading(false);
   };
 
   return (
-    <div className="space-y-6 animate-fade-in pb-24 pt-4 md:pb-6">
+    <div className="space-y-6 animate-fade-in pb-24 pt-2 md:pb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="glass-card p-6 md:p-8 border-emerald-500/20">
           <h2 className="text-xl font-bold uppercase text-emerald-400 mb-6 flex items-center gap-2 tracking-widest border-b border-emerald-500/20 pb-2"><Pizza size={20}/> Fuel the Engine</h2>
-          <form onSubmit={(e) => { e.preventDefault(); logMeal(food, protein, false); setFood(''); setProtein(''); }} className="space-y-4">
+          <p className="text-xs text-emerald-100/50 mb-4 uppercase tracking-widest">Current Phase: <span className="text-emerald-400 font-bold">{user.dietPhase}</span></p>
+          <div className="space-y-4">
             <div>
               <label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Ration Description</label>
               <div className="flex gap-2">
-                <input placeholder="E.g. Smash Burger" required value={food} onChange={e=>setFood(e.target.value)} className="flex-1 bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" />
-                <button type="button" onClick={estimateMacrosWithAI} disabled={isAiLoading || !food} className="bg-emerald-900/40 border border-emerald-500/30 text-emerald-400 p-4 rounded hover:bg-emerald-800/50 transition flex items-center justify-center disabled:opacity-50" title="AI Macro Estimator">
+                <input placeholder="E.g. Large Pepperoni Pizza" required value={food} onChange={e=>setFood(e.target.value)} className="flex-1 bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" />
+                <button type="button" onClick={estimateAndJudgeFood} disabled={isAiLoading || !food} className="bg-emerald-900/40 border border-emerald-500/30 text-emerald-400 p-4 rounded hover:bg-emerald-800/50 transition flex items-center justify-center disabled:opacity-50" title="AI Macro Estimator & Judge">
                   {isAiLoading ? <Loader2 className="animate-spin" size={20}/> : <Sparkles size={20}/>}
                 </button>
               </div>
             </div>
-            <div><label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Protein Content</label><input type="number" placeholder="Protein (g)" required value={protein} onChange={e=>setProtein(e.target.value)} className="w-full bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" /></div>
-            <button type="submit" className="w-full py-4 mt-4 bg-emerald-700 hover:bg-emerald-600 font-black uppercase tracking-widest rounded text-white transition shadow-[0_0_15px_rgba(16,185,129,0.3)]">Log Nutrition</button>
-          </form>
+            <div>
+              <label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Manual Protein Log (Optional)</label>
+              <div className="flex gap-2">
+                <input type="number" placeholder="Protein (g)" value={protein} onChange={e=>setProtein(e.target.value)} className="flex-1 w-full bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" />
+                <button onClick={() => { logMeal(food, parseInt(protein)||0, false, null); setFood(''); setProtein(''); }} className="bg-emerald-700 hover:bg-emerald-600 font-black uppercase tracking-widest rounded px-6 text-white transition shadow-[0_0_15px_rgba(16,185,129,0.3)]">Log</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div className="glass-card p-6 md:p-8">
           <h3 className="text-lg font-bold text-white mb-6 uppercase tracking-widest border-b border-white/10 pb-2">Recent Rations</h3>
@@ -350,34 +433,55 @@ const FoodTab = ({ user, logMeal }) => {
   );
 };
 
-const ProfileTab = ({ user, updateBio }) => {
+const ProfileTab = ({ user, updateProfile, logout }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [bioText, setBioText] = useState(user.bio);
+  const [dietPhase, setDietPhase] = useState(user.dietPhase || 'Maintenance');
+
+  const handleSave = () => {
+    updateProfile({ bio: bioText, dietPhase: dietPhase });
+    setIsEditing(false);
+  };
+
   return (
-    <div className="space-y-6 animate-fade-in pb-24 pt-4 md:pb-6">
+    <div className="space-y-6 animate-fade-in pb-24 pt-2 md:pb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="glass-card p-8 text-center flex flex-col items-center relative overflow-hidden">
            <div className="absolute top-0 left-0 w-full h-32 md:h-48 bg-gradient-to-b from-indigo-900/40 to-transparent"></div>
+           <div className="absolute top-4 right-4 z-20"><button onClick={logout} className="text-xs text-gray-500 hover:text-white uppercase tracking-widest bg-black/50 px-3 py-1 rounded border border-white/10">Logout</button></div>
            <div className="z-10 mt-4 md:mt-12"><ImageAvatar heroName={user.heroName} size={140} /></div>
            <h2 className="text-3xl md:text-4xl font-black uppercase text-white mt-6 tracking-widest z-10">{user.username}</h2>
            <p className="text-indigo-400 font-bold mb-6 uppercase tracking-widest text-sm z-10">Level {user.level} {user.franchise}</p>
            {isEditing ? (
-             <div className="w-full max-w-sm flex gap-2 z-10"><input value={bioText} onChange={e=>setBioText(e.target.value)} className="flex-1 bg-black/50 border border-indigo-500/50 rounded p-3 text-white text-sm text-center outline-none" /><button onClick={()=>{updateBio(bioText); setIsEditing(false);}} className="bg-indigo-600 px-6 font-bold uppercase tracking-widest rounded text-white text-xs transition hover:bg-indigo-500">Save</button></div>
-           ) : (<p className="text-gray-300 italic text-sm cursor-pointer hover:text-white z-10 bg-black/30 p-4 rounded-lg border border-white/10 w-full max-w-sm transition" onClick={()=>setIsEditing(true)}>"{user.bio}" <span className="text-xs text-indigo-400 ml-2">Edit</span></p>)}
+             <div className="w-full max-w-sm flex flex-col gap-3 z-10">
+               <input value={bioText} onChange={e=>setBioText(e.target.value)} className="bg-black/50 border border-indigo-500/50 rounded p-3 text-white text-sm text-center outline-none" />
+               <select value={dietPhase} onChange={e=>setDietPhase(e.target.value)} className="bg-black/50 border border-indigo-500/50 rounded p-3 text-white text-sm text-center outline-none">
+                 <option value="Cut">Phase: Cut</option>
+                 <option value="Bulk">Phase: Bulk</option>
+                 <option value="Maintenance">Phase: Maintenance</option>
+               </select>
+               <button onClick={handleSave} className="bg-indigo-600 py-3 font-bold uppercase tracking-widest rounded text-white text-xs transition hover:bg-indigo-500">Save Profile</button>
+             </div>
+           ) : (
+             <div className="flex flex-col items-center gap-2 z-10 w-full max-w-sm">
+                <p className="text-gray-300 italic text-sm cursor-pointer hover:text-white bg-black/30 p-4 rounded-lg border border-white/10 w-full transition" onClick={()=>setIsEditing(true)}>"{user.bio}" <span className="text-xs text-indigo-400 ml-2">Edit</span></p>
+                <p className="text-xs text-gray-500 uppercase tracking-widest">Protocol: <span className="text-indigo-400 font-bold">{user.dietPhase}</span></p>
+             </div>
+           )}
         </div>
         <div className="space-y-6">
           <div className="glass-card p-6">
             <h3 className="text-lg font-bold uppercase text-emerald-400 mb-6 flex items-center gap-2 tracking-widest border-b border-white/10 pb-2"><Briefcase size={18}/> Arsenal Stash</h3>
             {(!user.inventory || user.inventory.length === 0) ? (<p className="text-sm text-gray-500 italic">Hit a PR on core lifts to unlock loot.</p>) : (
-              <ul className="space-y-3">{user.inventory.map((item, i) => (<li key={i} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded"><span className="text-emerald-500"><Swords size={16}/></span><span className="text-sm text-emerald-100 font-bold tracking-wider uppercase">{item}</span></li>))}</ul>
+              <ul className="space-y-3 max-h-[150px] overflow-y-auto hide-scrollbar">{user.inventory.map((item, i) => (<li key={i} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded"><span className="text-emerald-500"><Swords size={16}/></span><span className="text-sm text-emerald-100 font-bold tracking-wider uppercase">{item}</span></li>))}</ul>
             )}
           </div>
           <div className="glass-card p-6">
             <h3 className="text-lg font-bold uppercase text-white mb-6 flex items-center gap-2 tracking-widest border-b border-white/10 pb-2">Loot Roadmap</h3>
-            <div className="relative border-l-2 border-indigo-900 ml-4 space-y-8">
+            <div className="relative border-l-2 border-indigo-900 ml-4 space-y-8 max-h-[250px] overflow-y-auto hide-scrollbar pl-2">
               {LOOT_ROADMAP.map((tier, i) => (
-                <div key={i} className="pl-8 relative">
-                  <div className={`absolute -left-[11px] top-1 w-5 h-5 rounded-full border-4 border-[#0a0a0a] ${user.level >= tier.level ? 'bg-indigo-500 shadow-[0_0_15px_#6366f1]' : 'bg-gray-800'}`}></div>
+                <div key={i} className="pl-6 relative">
+                  <div className={`absolute -left-[35px] top-1 w-5 h-5 rounded-full border-4 border-[#0a0a0a] ${user.level >= tier.level ? 'bg-indigo-500 shadow-[0_0_15px_#6366f1]' : 'bg-gray-800'}`}></div>
                   <p className={`font-black uppercase tracking-widest text-sm mb-1 ${user.level >= tier.level ? 'text-white' : 'text-gray-600'}`}>Level {tier.level}</p>
                   <p className={`text-sm ${user.level >= tier.level ? 'text-indigo-300 font-medium' : 'text-gray-700'}`}>{tier.item}</p>
                 </div>
@@ -398,24 +502,26 @@ const ChatTab = ({ user }) => {
   const currentMentor = activeChannel === 'franchise' ? defaultCompanion : MENTORS[activeChannel];
 
   const handleChannelSwitch = (channel) => { setActiveChannel(channel); setMessages([{ sender: 'ai', text: `You have tuned into the frequency. What's the protocol today?` }]); };
+  
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
     const userText = input; setInput(''); setMessages(prev => [...prev, { sender: 'user', text: userText }, { sender: 'ai', text: '...' }]);
     try {
-      let systemPrompt = activeChannel === 'franchise' ? `You are ${currentMentor.name} from the ${user.franchise} universe. You are an AI companion. Keep response to one punchy sentence. No emojis.` : `${currentMentor.system} Keep your response to one short sentence. No emojis.`;
+      let systemPrompt = activeChannel === 'franchise' ? `You are ${currentMentor.name} from the ${user.franchise} universe. You are an AI companion. Answer with 2 detailed paragraphs. No emojis.` : `${currentMentor.system}`;
       const chatHistory = messages.filter(m => m.text !== '...').map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }));
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST", headers: { "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], temperature: 0.7, max_tokens: 150 })
+        body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], temperature: 0.7, max_tokens: 600 })
       });
       if (!response.ok) throw new Error(`HTTP Status ${response.status}`);
       const data = await response.json();
-      setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: data.choices[0].message.content.replace(/"/g, '') }; return newMsgs; });
+      setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: data.choices[0].message.content }; return newMsgs; });
     } catch (error) { setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: `ERROR: ${error.message}.` }; return newMsgs; }); }
   };
+
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] md:h-[calc(100vh-40px)] animate-fade-in glass-card overflow-hidden mt-4 md:mt-0">
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] animate-fade-in glass-card overflow-hidden mt-2 md:mt-0">
       <div className={`p-4 md:p-6 border-b flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${currentMentor.bg} ${currentMentor.border} transition-colors duration-500`}>
         <div className="flex items-center gap-4"><span className="text-3xl md:text-4xl bg-black/50 p-2 md:p-3 rounded-full border border-white/10">{currentMentor.icon}</span><div><h2 className={`font-black uppercase tracking-widest text-lg md:text-xl ${currentMentor.color}`}>{currentMentor.name}</h2><p className="text-xs text-gray-400 uppercase tracking-widest mt-1 flex items-center gap-1"><Radio size={12}/> Secure Comms Channel</p></div></div>
         <select value={activeChannel} onChange={(e) => handleChannelSwitch(e.target.value)} className="bg-black/80 border border-white/20 text-white text-xs uppercase tracking-widest p-2 rounded outline-none w-full md:w-auto focus:border-indigo-500">
@@ -426,10 +532,14 @@ const ChatTab = ({ user }) => {
           <option value="Jeff Nippard">Mentor: Jeff Nippard</option>
         </select>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 hide-scrollbar pb-24 md:pb-6">
-        {messages.map((m, i) => (<div key={i} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] md:max-w-[60%] p-4 rounded-2xl text-sm md:text-base shadow-lg ${m.sender === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-[#1a1a1a] text-gray-200 border border-white/10 rounded-bl-none font-serif italic'}`}>{m.text}</div></div>))}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 hide-scrollbar pb-6">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[90%] md:max-w-[70%] p-4 rounded-2xl text-sm md:text-base shadow-lg whitespace-pre-wrap ${m.sender === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-[#1a1a1a] text-gray-200 border border-white/10 rounded-bl-none font-serif leading-relaxed'}`}>{m.text}</div>
+          </div>
+        ))}
       </div>
-      <div className="p-4 bg-black/40 border-t border-white/5 absolute bottom-0 w-full md:relative md:bg-transparent">
+      <div className="p-4 bg-black/40 border-t border-white/5">
         <form onSubmit={handleSend} className="max-w-3xl mx-auto bg-black/80 backdrop-blur-md border border-white/10 rounded-full p-2 flex gap-2 shadow-2xl"><input value={input} onChange={e=>setInput(e.target.value)} placeholder={`Consult ${currentMentor.name}...`} className="flex-1 bg-transparent px-6 text-white text-sm md:text-base focus:outline-none placeholder-gray-500" /><button type="submit" className="p-3 md:p-4 bg-indigo-600 rounded-full text-white hover:bg-indigo-500 transition"><Send size={18}/></button></form>
       </div>
     </div>
@@ -450,13 +560,8 @@ const WorkoutModal = ({ isOpen, onClose, logWorkout }) => {
   
   const handleSubmit = (e) => { 
     e.preventDefault(); 
-    if (mode === 'iron') {
-      logWorkout(date, split, exercises, 'iron'); 
-      setExercises([{ bodyPart: 'Chest', name: '', weight: '', reps: '', sets: '' }]); 
-    } else {
-      logWorkout(date, null, [], 'cardio', { activity: cardioActivity, duration: parseInt(duration) });
-      setDuration('');
-    }
+    if (mode === 'iron') { logWorkout(date, split, exercises, 'iron'); setExercises([{ bodyPart: 'Chest', name: '', weight: '', reps: '', sets: '' }]); } 
+    else { logWorkout(date, null, [], 'cardio', { activity: cardioActivity, duration: parseInt(duration) }); setDuration(''); }
     onClose(); 
   };
 
@@ -469,19 +574,14 @@ const WorkoutModal = ({ isOpen, onClose, logWorkout }) => {
         </div>
         
         <div className="flex w-full bg-black border-b border-white/10">
-           <button onClick={() => setMode('iron')} className={`flex-1 py-4 font-black uppercase tracking-widest text-sm transition ${mode === 'iron' ? 'bg-indigo-600/20 text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:bg-white/5'}`}>Iron (Weights)</button>
-           <button onClick={() => setMode('cardio')} className={`flex-1 py-4 font-black uppercase tracking-widest text-sm transition ${mode === 'cardio' ? 'bg-emerald-600/20 text-emerald-400 border-b-2 border-emerald-500' : 'text-gray-500 hover:bg-white/5'}`}>Athletics (Sports)</button>
+           <button type="button" onClick={() => setMode('iron')} className={`flex-1 py-4 font-black uppercase tracking-widest text-sm transition ${mode === 'iron' ? 'bg-indigo-600/20 text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:bg-white/5'}`}>Iron (Weights)</button>
+           <button type="button" onClick={() => setMode('cardio')} className={`flex-1 py-4 font-black uppercase tracking-widest text-sm transition ${mode === 'cardio' ? 'bg-emerald-600/20 text-emerald-400 border-b-2 border-emerald-500' : 'text-gray-500 hover:bg-white/5'}`}>Athletics (Sports)</button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 hide-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Date</label><input type="date" required value={date} onChange={(e)=>setDate(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition" /></div>
-            
-            {mode === 'iron' ? (
-              <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Split</label><select value={split} onChange={(e)=>setSplit(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition"><option>Blood & Guts (HIT)</option><option>Push/Pull/Legs</option><option>Upper/Lower</option><option>Full Body</option></select></div>
-            ) : (
-              <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Activity Type</label><select value={cardioActivity} onChange={(e)=>setCardioActivity(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-emerald-500 outline-none transition"><option>Running</option><option>Cycling</option><option>Football (Soccer)</option><option>Basketball</option><option>Swimming</option></select></div>
-            )}
+            {mode === 'iron' ? ( <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Split</label><select value={split} onChange={(e)=>setSplit(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition"><option>Blood & Guts (HIT)</option><option>Push/Pull/Legs</option><option>Upper/Lower</option><option>Full Body</option></select></div> ) : ( <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Activity Type</label><select value={cardioActivity} onChange={(e)=>setCardioActivity(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-emerald-500 outline-none transition"><option>Running</option><option>Cycling</option><option>Football (Soccer)</option><option>Basketball</option><option>Swimming</option></select></div> )}
           </div>
           
           {mode === 'iron' ? (
@@ -489,16 +589,11 @@ const WorkoutModal = ({ isOpen, onClose, logWorkout }) => {
               <label className="text-xs text-gray-400 uppercase tracking-widest block">Movements</label>
               {exercises.map((ex, i) => (
                 <div key={i} className="flex flex-col gap-3 bg-black/30 border border-white/5 p-4 rounded-xl">
-                  {/* FIX: Replaced md:flex-2 with explicit layout to stop squishing */}
                   <div className="flex flex-col md:flex-row gap-3">
                     <select value={ex.bodyPart} onChange={(e)=>handleUpdateRow(i, 'bodyPart', e.target.value)} className="w-full md:w-1/3 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition"><option value="Chest">Chest</option><option value="Back">Back</option><option value="Legs">Legs</option><option value="Shoulders">Shoulders</option><option value="Arms">Arms</option><option value="Core">Core</option></select>
                     <input placeholder="Exercise (e.g., Incline Press)" required value={ex.name} onChange={(e)=>handleUpdateRow(i, 'name', e.target.value)} className="w-full md:w-2/3 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
                   </div>
-                  <div className="flex gap-3">
-                    <input type="number" placeholder="Kg" required value={ex.weight} onChange={(e)=>handleUpdateRow(i, 'weight', e.target.value)} className="flex-1 w-full bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
-                    <input type="number" placeholder="Reps" required value={ex.reps} onChange={(e)=>handleUpdateRow(i, 'reps', e.target.value)} className="flex-1 w-full bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
-                    <input type="number" placeholder="Sets" required value={ex.sets} onChange={(e)=>handleUpdateRow(i, 'sets', e.target.value)} className="flex-1 w-full bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
-                  </div>
+                  <div className="flex gap-3"><input type="number" placeholder="Kg" required value={ex.weight} onChange={(e)=>handleUpdateRow(i, 'weight', e.target.value)} className="flex-1 w-full bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" /><input type="number" placeholder="Reps" required value={ex.reps} onChange={(e)=>handleUpdateRow(i, 'reps', e.target.value)} className="flex-1 w-full bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" /><input type="number" placeholder="Sets" required value={ex.sets} onChange={(e)=>handleUpdateRow(i, 'sets', e.target.value)} className="flex-1 w-full bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" /></div>
                 </div>
               ))}
               <button type="button" onClick={()=>setExercises([...exercises, { bodyPart: 'Chest', name: '', weight: '', reps: '', sets: '' }])} className="text-sm font-bold uppercase tracking-widest text-indigo-400 flex items-center justify-center gap-2 hover:text-indigo-300 mt-2 bg-indigo-900/30 w-full px-6 py-4 rounded-xl transition border border-indigo-500/20"><Plus size={18}/> Add Movement</button>
@@ -581,7 +676,7 @@ export default function App() {
   if (!engine.currentUser) return <DndLogin engine={engine} />;
 
   return (
-    <div className={`min-h-screen text-gray-100 font-sans flex overflow-hidden transition-all duration-75 ${engine.isScreenShaking ? 'animate-rage bg-red-950' : 'bg-[#050505]'}`}>
+    <div className={`min-h-screen text-gray-100 font-sans flex overflow-hidden transition-all duration-75 flex-col md:flex-row ${engine.isScreenShaking ? 'animate-rage bg-red-950' : 'bg-[#050505]'}`}>
       <style>{`
         .glass-card { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; } 
         .hide-scrollbar::-webkit-scrollbar { display: none; } 
@@ -590,12 +685,7 @@ export default function App() {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } } 
         @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } } 
         .animate-slide-down { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        
-        @keyframes rage { 
-          0%, 100% { transform: translate(0, 0) scale(1); } 
-          10%, 30%, 50%, 70%, 90% { transform: translate(-12px, 12px) scale(1.05); } 
-          20%, 40%, 60%, 80% { transform: translate(12px, -12px) scale(1.05); } 
-        } 
+        @keyframes rage { 0%, 100% { transform: translate(0, 0) scale(1); } 10%, 30%, 50%, 70%, 90% { transform: translate(-12px, 12px) scale(1.05); } 20%, 40%, 60%, 80% { transform: translate(12px, -12px) scale(1.05); } } 
         .animate-rage { animation: rage 0.7s cubic-bezier(.36,.07,.19,.97) both; }
         @keyframes flash { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
         .animate-flash { animation: flash 0.7s ease-in-out; }
@@ -603,6 +693,7 @@ export default function App() {
 
       {engine.isScreenShaking && <div className="fixed inset-0 bg-red-600/50 mix-blend-overlay z-[100] pointer-events-none animate-flash"></div>}
 
+      {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col w-64 border-r border-white/10 bg-[#0a0a0a] z-40 p-4">
         <div className="flex items-center gap-3 mb-10 px-2 mt-4"><Crown className="text-amber-500" size={28}/><h1 className="font-serif font-black text-xl tracking-widest text-amber-500">SYNDICATE</h1></div>
         <nav className="flex-1 space-y-4">
@@ -615,29 +706,35 @@ export default function App() {
         <button onClick={() => setIsWorkoutModalOpen(true)} className="w-full flex items-center justify-center gap-3 bg-indigo-600 text-white p-4 rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:bg-indigo-500 transition transform hover:scale-105"><Dumbbell size={20} /> <span className="font-black uppercase tracking-widest">Log Grind</span></button>
       </aside>
 
-      <main className="flex-1 relative overflow-y-auto hide-scrollbar z-10">
-        <div className="w-full max-w-md md:max-w-6xl mx-auto h-full px-4 md:px-8 py-4 md:py-8">
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 relative overflow-y-auto hide-scrollbar z-10 flex flex-col w-full h-screen">
+        
+        {/* GLOBAL COMMAND BAR */}
+        <TopSearchBar onNavigate={setActiveTab} onOpenWorkout={() => setIsWorkoutModalOpen(true)} />
+
+        <div className="w-full max-w-md md:max-w-6xl mx-auto px-4 md:px-8 py-4 md:py-8 flex-1">
           {activeTab === 'home' && <DashboardTab user={engine.currentUser} registry={engine.registry} logout={engine.logout} />}
           {activeTab === 'analytics' && <AnalyticsTab user={engine.currentUser} />}
           {activeTab === 'food' && <FoodTab user={engine.currentUser} logMeal={engine.logMeal} />}
           {activeTab === 'chat' && <ChatTab user={engine.currentUser} />}
-          {activeTab === 'profile' && <ProfileTab user={engine.currentUser} updateBio={engine.updateBio} />}
+          {activeTab === 'profile' && <ProfileTab user={engine.currentUser} updateProfile={engine.updateProfile} logout={engine.logout} />}
         </div>
       </main>
 
       {engine.aiPopup && (
-        <div className="fixed top-6 left-1/2 z-50 animate-slide-down w-[90%] max-w-sm md:max-w-md"><div className="p-4 md:p-6 border border-indigo-500/50 bg-indigo-950/95 backdrop-blur-xl shadow-[0_0_40px_rgba(79,70,229,0.5)] flex items-center gap-4 rounded-2xl"><span className="text-3xl md:text-4xl drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">✨</span><p className="text-indigo-100 font-serif italic text-sm md:text-base">"{engine.aiPopup.message}"</p></div></div>
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down w-[90%] max-w-sm md:max-w-md"><div className="p-4 md:p-6 border border-indigo-500/50 bg-indigo-950/95 backdrop-blur-xl shadow-[0_0_40px_rgba(79,70,229,0.5)] flex items-center gap-4 rounded-2xl"><span className="text-3xl md:text-4xl drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">✨</span><p className="text-indigo-100 font-serif italic text-sm md:text-base">"{engine.aiPopup.message}"</p></div></div>
       )}
 
       <WorkoutModal isOpen={isWorkoutModalOpen} onClose={() => setIsWorkoutModalOpen(false)} logWorkout={engine.logFullWorkout} />
 
+      {/* MOBILE BOTTOM NAVIGATION */}
       <nav className="md:hidden fixed bottom-0 w-full bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/5 z-40 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] pb-safe">
         <div className="flex justify-around items-center px-1 py-4 relative">
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-12 transition-colors ${activeTab === 'home' ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}><Home size={20} /><span className="text-[8px] mt-1.5 uppercase font-black tracking-widest">Base</span></button>
           <button onClick={() => setActiveTab('analytics')} className={`flex flex-col items-center w-12 transition-colors ${activeTab === 'analytics' ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}><Activity size={20} /><span className="text-[8px] mt-1.5 uppercase font-black tracking-widest">Data</span></button>
           <div className="relative w-16 flex justify-center"><button onClick={() => setIsWorkoutModalOpen(true)} className="absolute -top-10 bg-indigo-600 text-white p-4 rounded-full shadow-[0_0_25px_rgba(79,70,229,0.6)] border-4 border-[#050505] hover:scale-110 hover:bg-indigo-500 transition-all transform duration-300"><Dumbbell size={24} /></button></div>
+          <button onClick={() => setActiveTab('food')} className={`flex flex-col items-center w-12 transition-colors ${activeTab === 'food' ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}><Pizza size={20} /><span className="text-[8px] mt-1.5 uppercase font-black tracking-widest">Fuel</span></button>
           <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center w-12 transition-colors ${activeTab === 'chat' ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}><MessageSquare size={20} /><span className="text-[8px] mt-1.5 uppercase font-black tracking-widest">Comms</span></button>
-          <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center w-12 transition-colors ${activeTab === 'profile' ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}><User size={20} /><span className="text-[8px] mt-1.5 uppercase font-black tracking-widest">Profile</span></button>
         </div>
       </nav>
     </div>
