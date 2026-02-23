@@ -39,11 +39,11 @@ const COMPANIONS = {
 
 const LOOT_ROADMAP = [ { level: 1, item: 'Innate Might (Fists)' }, { level: 5, item: 'Franchise Weapon' }, { level: 10, item: 'Divine Artifact' } ];
 const LOOT_TABLE = {
-  'God of War': { 'bench': 'Leviathan Axe', 'squat': 'Blades of Chaos', 'deadlift': 'Draupnir Spear' },
-  'DC': { 'bench': 'Batarang Arsenal', 'squat': 'Kryptonite Ring', 'deadlift': 'Lasso of Truth' },
-  'Marvel': { 'bench': 'Vibranium Shield', 'squat': 'Mjolnir', 'deadlift': 'Infinity Gauntlet' },
-  'Godfather': { 'bench': 'Tommy Gun', 'squat': 'Bespoke Silk Suit', 'deadlift': 'The Don\'s Ring' },
-  'Vice City': { 'bench': 'Machete', 'squat': 'Chainsaw', 'deadlift': 'Vercetti Estate Keys' }
+  'God of War': { 'bench press': 'Leviathan Axe', 'squat': 'Blades of Chaos', 'deadlift': 'Draupnir Spear' },
+  'DC': { 'bench press': 'Batarang Arsenal', 'squat': 'Kryptonite Ring', 'deadlift': 'Lasso of Truth' },
+  'Marvel': { 'bench press': 'Vibranium Shield', 'squat': 'Mjolnir', 'deadlift': 'Infinity Gauntlet' },
+  'Godfather': { 'bench press': 'Tommy Gun', 'squat': 'Bespoke Silk Suit', 'deadlift': 'The Don\'s Ring' },
+  'Vice City': { 'bench press': 'Machete', 'squat': 'Chainsaw', 'deadlift': 'Vercetti Estate Keys' }
 };
 
 const playWorkoutFX = (franchise) => {
@@ -317,12 +317,7 @@ const ChatTab = ({ user }) => {
           "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ 
-          model: "llama-3.1-8b-instant", // <--- CHANGE THIS EXACT LINE
-          messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], 
-          temperature: 0.7, 
-          max_tokens: 100 
-        })
+        body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], temperature: 0.7, max_tokens: 100 })
       });
 
       if (!response.ok) {
@@ -369,37 +364,62 @@ const ChatTab = ({ user }) => {
 const WorkoutModal = ({ isOpen, onClose, logWorkout }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [split, setSplit] = useState('Blood & Guts (HIT)');
-  const [exercises, setExercises] = useState([{ name: '', weight: '', reps: '', sets: '' }]);
+  // Add bodyPart to the initial state
+  const [exercises, setExercises] = useState([{ bodyPart: 'Chest', name: '', weight: '', reps: '', sets: '' }]);
 
   if (!isOpen) return null;
 
-  // FIX: Immutable state update so typing works correctly!
   const handleUpdateRow = (index, field, value) => { 
     const newEx = [...exercises]; 
     newEx[index] = { ...newEx[index], [field]: value }; 
     setExercises(newEx); 
   };
   
-  const handleSubmit = (e) => { e.preventDefault(); logWorkout(date, split, exercises); onClose(); setExercises([{ name: '', weight: '', reps: '', sets: '' }]); };
+  const handleSubmit = (e) => { 
+    e.preventDefault(); 
+    logWorkout(date, split, exercises); 
+    onClose(); 
+    setExercises([{ bodyPart: 'Chest', name: '', weight: '', reps: '', sets: '' }]); 
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-fade-in">
       <div className="bg-[#0f0f0f] border border-indigo-500/30 w-full max-w-lg md:max-w-2xl rounded-xl shadow-[0_0_40px_rgba(79,70,229,0.2)] overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-6 border-b border-white/10 bg-black/50"><h2 className="text-xl md:text-2xl font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2"><Dumbbell size={24}/> Log Conquest</h2><button onClick={onClose} className="text-gray-400 hover:text-white transition"><X size={28}/></button></div>
+        
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 hide-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Date</label><input type="date" required value={date} onChange={(e)=>setDate(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition" /></div>
             <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Split</label><select value={split} onChange={(e)=>setSplit(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition"><option>Blood & Guts (HIT)</option><option>Push/Pull/Legs</option><option>Upper/Lower</option><option>Full Body</option></select></div>
           </div>
+          
           <div className="space-y-4">
-            <label className="text-xs text-gray-400 uppercase tracking-widest block">Exercises</label>
+            <label className="text-xs text-gray-400 uppercase tracking-widest block">Movements</label>
             {exercises.map((ex, i) => (
-              <div key={i} className="flex flex-col md:flex-row gap-2 items-center bg-white/5 md:bg-transparent p-3 md:p-0 rounded-lg">
-                <input placeholder="Movement" required value={ex.name} onChange={(e)=>handleUpdateRow(i, 'name', e.target.value)} className="w-full md:flex-2 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" />
-                <div className="w-full flex gap-2"><input type="number" placeholder="Kg" required value={ex.weight} onChange={(e)=>handleUpdateRow(i, 'weight', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" /><input type="number" placeholder="Reps" required value={ex.reps} onChange={(e)=>handleUpdateRow(i, 'reps', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" /><input type="number" placeholder="Sets" required value={ex.sets} onChange={(e)=>handleUpdateRow(i, 'sets', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" /></div>
+              <div key={i} className="flex flex-col gap-3 bg-black/30 border border-white/5 p-4 rounded-xl">
+                
+                {/* TOP ROW: Muscle Group and Exercise Name */}
+                <div className="flex flex-col md:flex-row gap-3">
+                  <select value={ex.bodyPart} onChange={(e)=>handleUpdateRow(i, 'bodyPart', e.target.value)} className="w-full md:w-1/3 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition">
+                    <option value="Chest">Chest</option>
+                    <option value="Back">Back</option>
+                    <option value="Legs">Legs</option>
+                    <option value="Shoulders">Shoulders</option>
+                    <option value="Arms">Arms</option>
+                    <option value="Core">Core</option>
+                  </select>
+                  <input placeholder="Exercise Name (e.g., Incline Press)" required value={ex.name} onChange={(e)=>handleUpdateRow(i, 'name', e.target.value)} className="w-full md:w-2/3 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
+                </div>
+                
+                {/* BOTTOM ROW: Weight, Reps, Sets */}
+                <div className="flex gap-3">
+                  <input type="number" placeholder="Kg" required value={ex.weight} onChange={(e)=>handleUpdateRow(i, 'weight', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
+                  <input type="number" placeholder="Reps" required value={ex.reps} onChange={(e)=>handleUpdateRow(i, 'reps', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
+                  <input type="number" placeholder="Sets" required value={ex.sets} onChange={(e)=>handleUpdateRow(i, 'sets', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none transition" />
+                </div>
               </div>
             ))}
-            <button type="button" onClick={()=>setExercises([...exercises, { name: '', weight: '', reps: '', sets: '' }])} className="text-sm font-bold uppercase tracking-widest text-indigo-400 flex items-center justify-center gap-2 hover:text-indigo-300 mt-4 bg-indigo-900/30 w-full md:w-auto px-6 py-3 rounded-lg transition"><Plus size={16}/> Add Movement</button>
+            <button type="button" onClick={()=>setExercises([...exercises, { bodyPart: 'Chest', name: '', weight: '', reps: '', sets: '' }])} className="text-sm font-bold uppercase tracking-widest text-indigo-400 flex items-center justify-center gap-2 hover:text-indigo-300 mt-2 bg-indigo-900/30 w-full px-6 py-4 rounded-xl transition border border-indigo-500/20"><Plus size={18}/> Add Movement</button>
           </div>
         </form>
         <div className="p-6 border-t border-white/10 bg-black/50"><button onClick={handleSubmit} className="w-full py-4 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition shadow-[0_0_15px_rgba(79,70,229,0.4)]">Commit to Iron</button></div>
@@ -477,7 +497,6 @@ export default function App() {
         @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } } 
         .animate-slide-down { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         
-        /* THE RAGE ANIMATION */
         @keyframes rage { 
           0%, 100% { transform: translate(0, 0) scale(1); } 
           10%, 30%, 50%, 70%, 90% { transform: translate(-8px, 8px) scale(1.02); } 
