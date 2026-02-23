@@ -46,7 +46,6 @@ const LOOT_TABLE = {
   'Vice City': { 'bench': 'Machete', 'squat': 'Chainsaw', 'deadlift': 'Vercetti Estate Keys' }
 };
 
-// Web Audio API to synthesize sounds on the fly (No downloads needed)
 const playWorkoutFX = (franchise) => {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const osc = audioCtx.createOscillator();
@@ -55,7 +54,6 @@ const playWorkoutFX = (franchise) => {
   gainNode.connect(audioCtx.destination);
 
   if (franchise === 'Godfather' || franchise === 'Vice City') {
-    // Subtle, sharp mafia flick/coin sound
     osc.type = 'sine';
     osc.frequency.setValueAtTime(1500, audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(3000, audioCtx.currentTime + 0.1);
@@ -64,7 +62,6 @@ const playWorkoutFX = (franchise) => {
     osc.start();
     osc.stop(audioCtx.currentTime + 0.15);
   } else {
-    // Cinematic, heavy hero Bass Drop/Boom
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(150, audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.6);
@@ -90,7 +87,7 @@ const useHero = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [aiPopup, setAiPopup] = useState(null);
   const [isDbLoading, setIsDbLoading] = useState(true);
-  const [isScreenShaking, setIsScreenShaking] = useState(false); // New FX State
+  const [isScreenShaking, setIsScreenShaking] = useState(false); 
 
   const fetchLeaderboard = async () => {
     const { data } = await supabase.from('syndicate_registry').select('username, hero_data');
@@ -164,7 +161,7 @@ const useHero = () => {
     // TRIGGER SCREEN SHAKE AND AUDIO
     playWorkoutFX(currentUser.franchise);
     setIsScreenShaking(true);
-    setTimeout(() => setIsScreenShaking(false), 500);
+    setTimeout(() => setIsScreenShaking(false), 700);
 
     let popupMsg = `The conquest advances! +${totalXpGained.toFixed(0)} XP.`;
     if (unlockedItems.length > 0) popupMsg = `Magnificent! You unlocked the ${unlockedItems.join(', ')}!`;
@@ -184,7 +181,6 @@ const useHero = () => {
 // --- 4. UI COMPONENTS ---
 
 const DashboardTab = ({ user, registry }) => {
-  // Generate the exact dates for the last 14 days
   const today = new Date();
   const last14Days = Array.from({length: 14}).map((_, i) => {
     const d = new Date(today);
@@ -207,7 +203,6 @@ const DashboardTab = ({ user, registry }) => {
           <h3 className="text-lg font-bold uppercase text-white mb-4 flex items-center gap-2 tracking-widest border-b border-white/10 pb-2"><CalIcon size={18} className="text-indigo-400"/> Conquest Calendar</h3>
           <div className="grid grid-cols-7 gap-2">
             {last14Days.map(dateStr => {
-              // Check if user has a workout on this specific date
               const hasWorkout = user.workouts?.some(w => w.date === dateStr);
               return (
                 <div key={dateStr} title={dateStr} className={`h-8 md:h-12 rounded transition-all duration-500 ${hasWorkout ? 'bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.6)] border border-indigo-400' : 'bg-black/40 border border-white/5'}`}></div>
@@ -233,7 +228,6 @@ const DashboardTab = ({ user, registry }) => {
   );
 };
 
-// ... FoodTab, ProfileTab, and WorkoutModal remain EXACTLY the same ...
 const FoodTab = ({ user, logMeal }) => {
   const [food, setFood] = useState('');
   const [protein, setProtein] = useState('');
@@ -326,13 +320,21 @@ const ChatTab = ({ user }) => {
         body: JSON.stringify({ model: "llama3-8b-8192", messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], temperature: 0.7, max_tokens: 100 })
       });
 
-      if (!response.ok) throw new Error('Network error');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `HTTP Status ${response.status}`);
+      }
+
       const data = await response.json();
       const aiResponse = data.choices[0].message.content.replace(/"/g, ''); 
 
       setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: aiResponse }; return newMsgs; });
     } catch (error) {
-      setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: "The comms channel is experiencing interference... check your API key." }; return newMsgs; });
+      setMessages(prev => { 
+        const newMsgs = [...prev]; 
+        newMsgs[newMsgs.length - 1] = { sender: 'ai', text: `ERROR: ${error.message}. (If you see "Network Error" or 401, Vercel is blocking your key. Check your Vercel settings and redeploy).` }; 
+        return newMsgs; 
+      });
     }
   };
 
@@ -366,7 +368,13 @@ const WorkoutModal = ({ isOpen, onClose, logWorkout }) => {
 
   if (!isOpen) return null;
 
-  const handleUpdateRow = (index, field, value) => { const newEx = [...exercises]; newEx[index][field] = value; setExercises(newEx); };
+  // FIX: Immutable state update so typing works correctly!
+  const handleUpdateRow = (index, field, value) => { 
+    const newEx = [...exercises]; 
+    newEx[index] = { ...newEx[index], [field]: value }; 
+    setExercises(newEx); 
+  };
+  
   const handleSubmit = (e) => { e.preventDefault(); logWorkout(date, split, exercises); onClose(); setExercises([{ name: '', weight: '', reps: '', sets: '' }]); };
 
   return (
@@ -454,8 +462,7 @@ export default function App() {
   if (!engine.currentUser) return <DndLogin engine={engine} />;
 
   return (
-    // NOTE: Added the dynamic `animate-shake` class and a red flash if `engine.isScreenShaking` is true
-    <div className={`min-h-screen ${engine.isScreenShaking ? 'bg-red-950/40 animate-shake' : 'bg-[#050505]'} text-gray-100 font-sans flex overflow-hidden transition-colors duration-100`}>
+    <div className={`min-h-screen text-gray-100 font-sans flex overflow-hidden transition-all duration-75 ${engine.isScreenShaking ? 'animate-rage bg-red-950' : 'bg-[#050505]'}`}>
       <style>{`
         .glass-card { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; } 
         .hide-scrollbar::-webkit-scrollbar { display: none; } 
@@ -465,16 +472,21 @@ export default function App() {
         @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } } 
         .animate-slide-down { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         
-        /* The Earthquake / Camera Shake Animation */
-        @keyframes shake { 
-          0%, 100% { transform: translate(0, 0) rotate(0deg); } 
-          20% { transform: translate(-4px, 4px) rotate(-1deg); } 
-          40% { transform: translate(4px, -4px) rotate(1deg); } 
-          60% { transform: translate(-4px, -4px) rotate(-1deg); } 
-          80% { transform: translate(4px, 4px) rotate(1deg); } 
+        /* THE RAGE ANIMATION */
+        @keyframes rage { 
+          0%, 100% { transform: translate(0, 0) scale(1); } 
+          10%, 30%, 50%, 70%, 90% { transform: translate(-8px, 8px) scale(1.02); } 
+          20%, 40%, 60%, 80% { transform: translate(8px, -8px) scale(1.02); } 
         } 
-        .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        .animate-rage { animation: rage 0.6s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes flash { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+        .animate-flash { animation: flash 0.6s ease-in-out; }
       `}</style>
+
+      {/* FULL SCREEN BLOOD RED FLASH OVERLAY */}
+      {engine.isScreenShaking && (
+        <div className="fixed inset-0 bg-red-600/40 mix-blend-overlay z-[100] pointer-events-none animate-flash"></div>
+      )}
 
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col w-64 border-r border-white/10 bg-[#0a0a0a] z-40 p-4">
@@ -489,7 +501,7 @@ export default function App() {
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 relative overflow-y-auto hide-scrollbar">
+      <main className="flex-1 relative overflow-y-auto hide-scrollbar z-10">
         <div className="w-full max-w-md md:max-w-6xl mx-auto h-full px-4 md:px-8 py-4 md:py-8">
           {activeTab === 'home' && <DashboardTab user={engine.currentUser} registry={engine.registry} />}
           {activeTab === 'food' && <FoodTab user={engine.currentUser} logMeal={engine.logMeal} />}
