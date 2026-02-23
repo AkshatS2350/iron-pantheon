@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dumbbell, Shield, Skull, Pizza, Trophy, Swords, Scroll, Crown, Briefcase, MessageSquare, User, Home, Plus, X, Calendar as CalIcon, Send, Loader2, Sparkles } from 'lucide-react';
+import { Dumbbell, Shield, Skull, Pizza, Trophy, Swords, Scroll, Crown, Briefcase, MessageSquare, User, Home, Plus, X, Calendar as CalIcon, Send, Loader2, Sparkles, Radio } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- 0. CLOUD CONNECTIONS ---
@@ -7,15 +7,26 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- 1. LORE DATA & ASSETS ---
+// --- 1. LORE DATA, ASSETS & AI MENTORS ---
+import kratosImg from './assets/kratos-hero.png';
+import batmanImg from './assets/batman-hero.png';
+import supermanImg from './assets/superman-hero.png';
+import ironmanImg from './assets/ironman-hero.png';
+import spidermanImg from './assets/spiderman-hero.png';
+import vitoImg from './assets/vito-hero.png';
+import michaelImg from './assets/michael-hero.png';
+import tommyImg from './assets/tommy-hero.png';
+
 const HEROES = {
-  Kratos: { franchise: 'God of War', image: 'https://cdn-icons-png.flaticon.com/512/3593/3593539.png', glow: 'rgba(220,38,38,0.6)' }, 
-  Batman: { franchise: 'DC', image: 'https://cdn-icons-png.flaticon.com/512/1007/1007004.png', glow: 'rgba(250,204,21,0.6)' }, 
-  Superman: { franchise: 'DC', image: 'https://cdn-icons-png.flaticon.com/512/805/805404.png', glow: 'rgba(37,99,235,0.6)' }, 
-  IronMan: { franchise: 'Marvel', image: 'https://cdn-icons-png.flaticon.com/512/1154/1154448.png', glow: 'rgba(220,38,38,0.6)' }, 
-  Vito: { franchise: 'Godfather', image: 'https://cdn-icons-png.flaticon.com/512/3067/3067302.png', glow: 'rgba(180,83,9,0.6)' }, 
-  Tommy: { franchise: 'Vice City', image: 'https://cdn-icons-png.flaticon.com/512/8221/8221151.png', glow: 'rgba(236,72,153,0.6)' },
-  Messi: { franchise: 'Football', image: 'https://cdn-icons-png.flaticon.com/512/5323/5323344.png', glow: 'rgba(56,189,248,0.8)' } // Lionel Messi Added
+  Kratos: { franchise: 'God of War', image: kratosImg, glow: 'rgba(220,38,38,0.6)' }, 
+  Batman: { franchise: 'DC', image: batmanImg, glow: 'rgba(250,204,21,0.6)' }, 
+  Superman: { franchise: 'DC', image: supermanImg, glow: 'rgba(37,99,235,0.6)' }, 
+  IronMan: { franchise: 'Marvel', image: ironmanImg, glow: 'rgba(220,38,38,0.6)' }, 
+  SpiderMan: { franchise: 'Marvel', image: spidermanImg, glow: 'rgba(37,99,235,0.6)' },
+  Vito: { franchise: 'Godfather', image: vitoImg, glow: 'rgba(180,83,9,0.6)' }, 
+  Michael: { franchise: 'Godfather', image: michaelImg, glow: 'rgba(255,255,255,0.4)' },
+  Tommy: { franchise: 'Vice City', image: tommyImg, glow: 'rgba(236,72,153,0.6)' },
+  Messi: { franchise: 'Football', image: 'https://cdn-icons-png.flaticon.com/512/5323/5323344.png', glow: 'rgba(56,189,248,0.8)' }
 };
 
 const COMPANIONS = {
@@ -27,14 +38,22 @@ const COMPANIONS = {
   'Football': { name: 'Lionel Scaloni', icon: '⚽', color: 'text-sky-400', bg: 'bg-sky-950/40', border: 'border-sky-500/50' }
 };
 
+// THE NEW MENTOR PERSONALITIES
+const MENTORS = {
+  'Mike Mentzer': { name: 'Mike Mentzer', icon: '🧠', color: 'text-zinc-400', bg: 'bg-zinc-950/40', border: 'border-zinc-500/50', system: "You are Mike Mentzer. Advocate for Heavy Duty training: one single set to absolute muscular failure. Emphasize logic, objectivism, and extreme recovery. Be highly intellectual and intense." },
+  'Dorian Yates': { name: 'Dorian Yates', icon: '🦍', color: 'text-stone-400', bg: 'bg-stone-950/40', border: 'border-stone-500/50', system: "You are six-time Mr. Olympia Dorian Yates. Advocate for Blood & Guts High-Intensity Training. Speak with a gritty, no-nonsense British tone. Push the user to the absolute dark place of muscular failure." },
+  'Tom Platz': { name: 'Tom Platz', icon: '🦵', color: 'text-yellow-400', bg: 'bg-yellow-950/40', border: 'border-yellow-500/50', system: "You are Tom Platz, the Golden Eagle. You are intensely passionate, almost psychotic, about leg day and pushing past the pain barrier. Talk about the mind-muscle connection and surviving high reps." },
+  'Jeff Nippard': { name: 'Jeff Nippard', icon: '🧬', color: 'text-cyan-400', bg: 'bg-cyan-950/40', border: 'border-cyan-500/50', system: "You are Jeff Nippard. You are a science-based natural bodybuilder. Focus on biomechanics, hypertrophy studies, and optimal technique. Speak politely, scientifically, and highly analytically." }
+};
+
 const LOOT_ROADMAP = [ { level: 1, item: 'Innate Might' }, { level: 5, item: 'Franchise Weapon' }, { level: 10, item: 'Divine Artifact' } ];
 const LOOT_TABLE = {
-  'God of War': { 'bench': 'Leviathan Axe', 'squat': 'Blades of Chaos', 'deadlift': 'Draupnir Spear' },
-  'DC': { 'bench': 'Batarang Arsenal', 'squat': 'Kryptonite Ring', 'deadlift': 'Lasso of Truth' },
-  'Marvel': { 'bench': 'Vibranium Shield', 'squat': 'Mjolnir', 'deadlift': 'Infinity Gauntlet' },
-  'Godfather': { 'bench': 'Tommy Gun', 'squat': 'Bespoke Silk Suit', 'deadlift': 'The Don\'s Ring' },
-  'Vice City': { 'bench': 'Machete', 'squat': 'Chainsaw', 'deadlift': 'Vercetti Estate Keys' },
-  'Football': { 'bench': 'Golden Boot', 'squat': 'Ballon d\'Or', 'deadlift': 'World Cup Trophy' }
+  'God of War': { 'bench press': 'Leviathan Axe', 'squat': 'Blades of Chaos', 'deadlift': 'Draupnir Spear' },
+  'DC': { 'bench press': 'Batarang Arsenal', 'squat': 'Kryptonite Ring', 'deadlift': 'Lasso of Truth' },
+  'Marvel': { 'bench press': 'Vibranium Shield', 'squat': 'Mjolnir', 'deadlift': 'Infinity Gauntlet' },
+  'Godfather': { 'bench press': 'Tommy Gun', 'squat': 'Bespoke Silk Suit', 'deadlift': 'The Don\'s Ring' },
+  'Vice City': { 'bench press': 'Machete', 'squat': 'Chainsaw', 'deadlift': 'Vercetti Estate Keys' },
+  'Football': { 'bench press': 'Golden Boot', 'squat': 'Ballon d\'Or', 'deadlift': 'World Cup Trophy' }
 };
 
 const playWorkoutFX = (franchise) => {
@@ -94,7 +113,6 @@ const useHero = () => {
     if (data) setRegistry(data.map(d => ({ username: d.username, ...d.hero_data })));
   };
 
-  // CHECK LOCAL STORAGE ON MOUNT TO PREVENT LOGOUT
   useEffect(() => {
     const restoreSession = async () => {
       const savedUser = localStorage.getItem('syndicate_active_user');
@@ -119,7 +137,7 @@ const useHero = () => {
     if (data.password !== password) return { success: false, error: "Incorrect passcode." };
     
     setCurrentUser({ username: data.username, ...data.hero_data });
-    localStorage.setItem('syndicate_active_user', data.username); // SAVE SESSION
+    localStorage.setItem('syndicate_active_user', data.username); 
     return { success: true };
   };
 
@@ -132,7 +150,7 @@ const useHero = () => {
     if (error) return { success: false, error: "The database rejected your entry." };
     
     setCurrentUser({ username, ...newHeroData });
-    localStorage.setItem('syndicate_active_user', username); // SAVE SESSION
+    localStorage.setItem('syndicate_active_user', username); 
     fetchLeaderboard();
     return { success: true };
   };
@@ -158,7 +176,6 @@ const useHero = () => {
       if (ex.weight > prevWeight) {
         newPrs[ex.name] = ex.weight;
         const normalizedEx = ex.name.toLowerCase().trim();
-        // Check if any word in their exercise matches a core lift
         const matchedLift = Object.keys(LOOT_TABLE[currentUser.franchise]).find(key => normalizedEx.includes(key));
         if (matchedLift) {
           const possibleItem = LOOT_TABLE[currentUser.franchise][matchedLift];
@@ -195,7 +212,7 @@ const useHero = () => {
   
   const logout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('syndicate_active_user'); // CLEAR SESSION
+    localStorage.removeItem('syndicate_active_user'); 
   };
 
   return { currentUser, registry, isDbLoading, loginUser, registerUser, logFullWorkout, logMeal, updateBio, aiPopup, isScreenShaking, logout };
@@ -217,7 +234,7 @@ const DashboardTab = ({ user, registry, logout }) => {
         <div>
           <h2 className="text-3xl md:text-5xl font-black uppercase text-white tracking-widest">{user.username}</h2>
           <p className="text-indigo-400 font-bold text-sm md:text-lg tracking-widest uppercase mt-2">Level {user.level} • {Math.floor(user.xp)} XP</p>
-          <button onClick={logout} className="mt-2 text-xs text-gray-500 hover:text-white uppercase tracking-widest">Logout</button>
+          <button onClick={logout} className="mt-2 text-xs text-gray-500 hover:text-white uppercase tracking-widest transition">Logout</button>
         </div>
         <ImageAvatar heroName={user.heroName} size={80} />
       </div>
@@ -252,7 +269,6 @@ const DashboardTab = ({ user, registry, logout }) => {
   );
 };
 
-// --- NEW AI FOOD TAB ---
 const FoodTab = ({ user, logMeal }) => {
   const [food, setFood] = useState('');
   const [protein, setProtein] = useState('');
@@ -288,7 +304,7 @@ const FoodTab = ({ user, logMeal }) => {
               <label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Ration Description</label>
               <div className="flex gap-2">
                 <input placeholder="E.g. Chicken Smash Burger" required value={food} onChange={e=>setFood(e.target.value)} className="flex-1 bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" />
-                <button type="button" onClick={estimateMacrosWithAI} disabled={isAiLoading || !food} className="bg-emerald-900/40 border border-emerald-500/30 text-emerald-400 p-4 rounded hover:bg-emerald-800/50 transition flex items-center justify-center disabled:opacity-50">
+                <button type="button" onClick={estimateMacrosWithAI} disabled={isAiLoading || !food} className="bg-emerald-900/40 border border-emerald-500/30 text-emerald-400 p-4 rounded hover:bg-emerald-800/50 transition flex items-center justify-center disabled:opacity-50" title="Auto-calculate macros">
                   {isAiLoading ? <Loader2 className="animate-spin" size={20}/> : <Sparkles size={20}/>}
                 </button>
               </div>
@@ -349,10 +365,23 @@ const ProfileTab = ({ user, updateBio }) => {
   );
 };
 
+// --- UPGRADED CHAT TAB WITH FREQUENCY SWITCHER ---
 const ChatTab = ({ user }) => {
-  const companion = COMPANIONS[user.franchise] || COMPANIONS['God of War'];
+  // Determine default lore companion
+  const defaultCompanion = COMPANIONS[user.franchise] || COMPANIONS['God of War'];
+  // State to track which mentor frequency you are tuned into
+  const [activeChannel, setActiveChannel] = useState('franchise'); 
   const [messages, setMessages] = useState([{ sender: 'ai', text: `I am here. Speak your mind.` }]);
   const [input, setInput] = useState('');
+
+  // Get current active mentor data
+  const currentMentor = activeChannel === 'franchise' ? defaultCompanion : MENTORS[activeChannel];
+
+  // Reset chat if you switch channels
+  const handleChannelSwitch = (channel) => {
+    setActiveChannel(channel);
+    setMessages([{ sender: 'ai', text: `You have tuned into the frequency. What's the protocol today?` }]);
+  };
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -363,18 +392,26 @@ const ChatTab = ({ user }) => {
     setMessages(prev => [...prev, { sender: 'user', text: userText }, { sender: 'ai', text: '...' }]);
 
     try {
-      const systemPrompt = `You are ${companion.name} from the ${user.franchise} universe. You are an AI companion for a fitness app. The user trains with brutal, high-intensity methodology. Keep your response to exactly one short, punchy, in-character sentence. Do not use emojis or hashtags.`;
+      // Switch system prompt based on who you are talking to
+      let systemPrompt = "";
+      if (activeChannel === 'franchise') {
+        systemPrompt = `You are ${currentMentor.name} from the ${user.franchise} universe. You are an AI companion for a fitness app. The user trains with brutal, high-intensity methodology. Keep your response to exactly one short, punchy, in-character sentence. Do not use emojis or hashtags.`;
+      } else {
+        systemPrompt = `${currentMentor.system} The user asks: ${userText}. Keep your response to exactly one short, punchy sentence. Do not use emojis.`;
+      }
+
       const chatHistory = messages.filter(m => m.text !== '...').map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }));
 
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], temperature: 0.7, max_tokens: 100 })
+        body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], temperature: 0.7, max_tokens: 150 })
       });
 
       if (!response.ok) throw new Error(`HTTP Status ${response.status}`);
       const data = await response.json();
       const aiResponse = data.choices[0].message.content.replace(/"/g, ''); 
+
       setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: aiResponse }; return newMsgs; });
     } catch (error) {
       setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: `ERROR: ${error.message}.` }; return newMsgs; });
@@ -383,11 +420,32 @@ const ChatTab = ({ user }) => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-100px)] md:h-[calc(100vh-40px)] animate-fade-in glass-card overflow-hidden mt-4 md:mt-0">
-      <div className={`p-6 border-b flex items-center gap-4 ${companion.bg} ${companion.border}`}>
-        <span className="text-4xl bg-black/50 p-3 rounded-full border border-white/10">{companion.icon}</span>
-        <div><h2 className={`font-black uppercase tracking-widest text-xl ${companion.color}`}>{companion.name}</h2><p className="text-xs text-gray-400 uppercase tracking-widest mt-1">Secure Comms Channel</p></div>
+      
+      {/* CHANNEL HEADER */}
+      <div className={`p-4 md:p-6 border-b flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${currentMentor.bg} ${currentMentor.border} transition-colors duration-500`}>
+        <div className="flex items-center gap-4">
+          <span className="text-3xl md:text-4xl bg-black/50 p-2 md:p-3 rounded-full border border-white/10">{currentMentor.icon}</span>
+          <div>
+            <h2 className={`font-black uppercase tracking-widest text-lg md:text-xl ${currentMentor.color}`}>{currentMentor.name}</h2>
+            <p className="text-xs text-gray-400 uppercase tracking-widest mt-1 flex items-center gap-1"><Radio size={12}/> Secure Comms Channel</p>
+          </div>
+        </div>
+        
+        {/* DROPDOWN TO SWITCH MENTORS */}
+        <select 
+          value={activeChannel} 
+          onChange={(e) => handleChannelSwitch(e.target.value)}
+          className="bg-black/80 border border-white/20 text-white text-xs uppercase tracking-widest p-2 rounded outline-none w-full md:w-auto focus:border-indigo-500"
+        >
+          <option value="franchise">Lore: {defaultCompanion.name}</option>
+          <option value="Mike Mentzer">Mentor: Mike Mentzer</option>
+          <option value="Dorian Yates">Mentor: Dorian Yates</option>
+          <option value="Tom Platz">Mentor: Tom Platz</option>
+          <option value="Jeff Nippard">Mentor: Jeff Nippard</option>
+        </select>
       </div>
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar pb-24 md:pb-6">
+
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 hide-scrollbar pb-24 md:pb-6">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] md:max-w-[60%] p-4 rounded-2xl text-sm md:text-base shadow-lg ${m.sender === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-[#1a1a1a] text-gray-200 border border-white/10 rounded-bl-none font-serif italic'}`}>{m.text}</div>
@@ -396,8 +454,8 @@ const ChatTab = ({ user }) => {
       </div>
       <div className="p-4 bg-black/40 border-t border-white/5 absolute bottom-0 w-full md:relative md:bg-transparent">
         <form onSubmit={handleSend} className="max-w-3xl mx-auto bg-black/80 backdrop-blur-md border border-white/10 rounded-full p-2 flex gap-2 shadow-2xl">
-          <input value={input} onChange={e=>setInput(e.target.value)} placeholder="Consult the AI..." className="flex-1 bg-transparent px-6 text-white text-base focus:outline-none placeholder-gray-500" />
-          <button type="submit" className="p-4 bg-indigo-600 rounded-full text-white hover:bg-indigo-500 transition shadow-[0_0_10px_rgba(79,70,229,0.5)]"><Send size={20}/></button>
+          <input value={input} onChange={e=>setInput(e.target.value)} placeholder={`Consult ${currentMentor.name}...`} className="flex-1 bg-transparent px-6 text-white text-sm md:text-base focus:outline-none placeholder-gray-500" />
+          <button type="submit" className="p-3 md:p-4 bg-indigo-600 rounded-full text-white hover:bg-indigo-500 transition shadow-[0_0_10px_rgba(79,70,229,0.5)]"><Send size={18}/></button>
         </form>
       </div>
     </div>
@@ -443,7 +501,7 @@ const WorkoutModal = ({ isOpen, onClose, logWorkout }) => {
   );
 };
 
-// --- 4. DYNAMIC THEMED LOGIN ---
+// --- 5. DYNAMIC THEMED LOGIN UI ---
 const LOGIN_THEMES = [
   { name: 'D&D', bgClass: 'bg-[#050505] bg-[url("https://www.transparenttextures.com/patterns/dark-leather.png")]', cardBg: 'bg-[#0a0503]/95 border-amber-900/50', textAccent: 'text-amber-500', icon: <Scroll size={56} className="mx-auto text-amber-600 mb-6 drop-shadow-[0_0_10px_rgba(217,119,6,0.8)]" />, btnClass: 'bg-gradient-to-r from-amber-800 to-amber-600 text-black shadow-[0_0_15px_rgba(217,119,6,0.4)] hover:from-amber-700 hover:to-amber-500' },
   { name: 'Gotham', bgClass: 'bg-zinc-950 bg-[url("https://www.transparenttextures.com/patterns/concrete-wall.png")]', cardBg: 'bg-zinc-900/95 border-blue-900/50', textAccent: 'text-blue-500', icon: <Shield size={56} className="mx-auto text-blue-600 mb-6 drop-shadow-[0_0_10px_rgba(37,99,235,0.8)]" />, btnClass: 'bg-gradient-to-r from-blue-900 to-blue-700 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] hover:from-blue-800 hover:to-blue-600' },
@@ -457,8 +515,6 @@ const DndLogin = ({ engine }) => {
   const [heroName, setHeroName] = useState('Vito');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Pick random theme on load
   const [theme] = useState(LOGIN_THEMES[Math.floor(Math.random() * LOGIN_THEMES.length)]);
 
   const handleAuth = async (e) => {
@@ -499,7 +555,7 @@ const DndLogin = ({ engine }) => {
   );
 };
 
-// --- 5. ROOT APP ---
+// --- 6. ROOT APP ---
 export default function App() {
   const engine = useHero();
   const [activeTab, setActiveTab] = useState('home');
