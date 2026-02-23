@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Dumbbell, Shield, Skull, Pizza, Trophy, Swords, Scroll, Crown, Briefcase, MessageSquare, User, Home, Plus, X, Calendar as CalIcon, Send, Menu } from 'lucide-react';
+import { Dumbbell, Shield, Skull, Pizza, Trophy, Swords, Scroll, Crown, Briefcase, MessageSquare, User, Home, Plus, X, Calendar as CalIcon, Send, Loader2 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+
+// --- 0. INITIALIZE CLOUD CONNECTIONS ---
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- 1. IMPORT LOCAL ASSETS ---
 import kratosImg from './assets/kratos-hero.png';
@@ -49,46 +55,74 @@ const ImageAvatar = ({ heroName, size = 80 }) => {
   const hero = HEROES[heroName] || HEROES['Kratos'];
   return (
     <div className="animate-idle transition-transform duration-300 hover:scale-110 flex justify-center items-center" style={{ filter: `drop-shadow(0px 0px 15px ${hero.glow})` }}>
-      <img src={hero.image} alt={heroName} style={{ width: size, height: size, objectFit: 'contain' }} className="rounded-lg shadow-lg" />
+      <img src={hero.image} alt={heroName} style={{ width: size, height: size, objectFit: 'contain' }} className="rounded-lg opacity-90" />
     </div>
   );
 };
 
-// ... keep everything from useHero() downwards exactly the same ...
-// --- 2. GAME ENGINE ---
+// --- 3. CLOUD GAME ENGINE (SUPABASE) ---
 const useHero = () => {
-  const [registry, setRegistry] = useState(() => JSON.parse(localStorage.getItem('pantheon_registry') || '[]'));
+  const [registry, setRegistry] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [aiPopup, setAiPopup] = useState(null);
+  const [isDbLoading, setIsDbLoading] = useState(true);
 
-  useEffect(() => {
-    localStorage.setItem('pantheon_registry', JSON.stringify(registry));
-  }, [registry]);
+  // Fetch Leaderboard on mount
+  const fetchLeaderboard = async () => {
+    const { data, error } = await supabase.from('syndicate_registry').select('username, hero_data');
+    if (data) {
+      const mapped = data.map(d => ({ username: d.username, ...d.hero_data }));
+      setRegistry(mapped);
+    }
+    setIsDbLoading(false);
+  };
+
+  useEffect(() => { fetchLeaderboard(); }, []);
 
   const triggerAiPopup = (franchise, message) => {
     setAiPopup({ franchise, message });
     setTimeout(() => setAiPopup(null), 5000); 
   };
 
-  const loginUser = (username, password) => {
-    const existing = registry.find(u => u.username === username);
-    if (existing && existing.password === password) {
-      setCurrentUser({ bio: "I am ready to conquer.", workouts: [], meals: [], inventory: [], ...existing });
-      return true;
-    }
-    return false;
+  const loginUser = async (username, password) => {
+    const { data, error } = await supabase.from('syndicate_registry').select('*').eq('username', username).single();
+    
+    if (error || !data) return { success: false, error: "Identity not found in the realm." };
+    if (data.password !== password) return { success: false, error: "Incorrect passcode." };
+    
+    setCurrentUser({ username: data.username, ...data.hero_data });
+    return { success: true };
   };
 
-  const registerUser = (username, password, heroName, franchise) => {
-    const newUser = { username, password, heroName, franchise, xp: 0, level: 1, prs: {}, inventory: [], bio: "A new legend begins.", workouts: [], meals: [] };
-    setRegistry([...registry, newUser]);
-    setCurrentUser(newUser);
+  const registerUser = async (username, password, heroName, franchise) => {
+    // Check if exists
+    const { data: existing } = await supabase.from('syndicate_registry').select('username').eq('username', username).single();
+    if (existing) return { success: false, error: "Alias already claimed." };
+
+    const newHeroData = { heroName, franchise, xp: 0, level: 1, prs: {}, inventory: [], bio: "A new legend begins.", workouts: [], meals: [], cheatMeals: [] };
+    
+    const { error } = await supabase.from('syndicate_registry').insert([{ 
+      username, 
+      password, 
+      hero_data: newHeroData 
+    }]);
+
+    if (error) return { success: false, error: "The database rejected your entry." };
+    
+    setCurrentUser({ username, ...newHeroData });
+    fetchLeaderboard();
+    return { success: true };
   };
 
-  const updateUserState = (updates) => {
+  const updateUserState = async (updates) => {
     const updatedUser = { ...currentUser, ...updates };
-    setCurrentUser(updatedUser);
-    setRegistry(registry.map(u => u.username === currentUser.username ? updatedUser : u));
+    setCurrentUser(updatedUser); // Optimistic UI update
+
+    // Extract just the hero_data payload
+    const { username, ...hero_data } = updatedUser;
+
+    await supabase.from('syndicate_registry').update({ hero_data }).eq('username', username);
+    fetchLeaderboard(); // Refresh leaderboard
   };
 
   const logFullWorkout = (date, split, exercises) => {
@@ -133,13 +167,13 @@ const useHero = () => {
   const updateBio = (newBio) => updateUserState({ bio: newBio });
   const logout = () => setCurrentUser(null);
 
-  return { currentUser, registry, loginUser, registerUser, logFullWorkout, logMeal, updateBio, aiPopup, logout };
+  return { currentUser, registry, isDbLoading, loginUser, registerUser, logFullWorkout, logMeal, updateBio, aiPopup, logout };
 };
 
-// --- 3. UI COMPONENTS ---
+// --- 4. UI COMPONENTS ---
 
-const DashboardTab = ({ user }) => (
-  <div className="space-y-6 animate-fade-in pb-24 md:pb-6">
+const DashboardTab = ({ user, registry }) => (
+  <div className="space-y-6 animate-fade-in pb-24 md:pb-6 pt-4">
     <div className="glass-card p-6 md:p-8 flex items-center justify-between">
       <div>
         <h2 className="text-3xl md:text-5xl font-black uppercase text-white tracking-widest">{user.username}</h2>
@@ -160,48 +194,39 @@ const DashboardTab = ({ user }) => (
       </div>
 
       <div className="glass-card p-6 flex flex-col">
-        <h3 className="text-lg font-bold uppercase text-white mb-4 flex items-center gap-2 tracking-widest border-b border-white/10 pb-2"><Trophy size={18} className="text-yellow-500"/> Volume Chart</h3>
-        <div className="flex-1 flex items-end gap-2 border-b border-white/20 pb-2 min-h-[150px]">
-           {[40, 70, 45, 90, 65, 100].map((h, i) => (
-             <div key={i} className="flex-1 bg-gradient-to-t from-indigo-900 to-indigo-500 hover:opacity-80 transition-all rounded-t" style={{ height: `${h}%` }}></div>
+         <h2 className="text-lg font-bold uppercase text-yellow-500 flex gap-2 border-b border-white/10 pb-2 mb-4"><Crown size={20} /> Global Leaderboard</h2>
+         <div className="space-y-2 overflow-y-auto max-h-[200px] hide-scrollbar">
+           {[...registry].sort((a, b) => b.xp - a.xp).map((u, index) => (
+             <div key={u.username} className={`flex justify-between p-3 rounded ${u.username === user.username ? 'bg-white/10 border border-white/20' : 'bg-black/30'}`}>
+               <p className="font-bold text-white">#{index + 1} {u.username} <span className="text-xs text-gray-400">({u.heroName})</span></p>
+               <p className="font-bold text-indigo-400">{Math.floor(u.xp)} XP</p>
+             </div>
            ))}
-        </div>
+         </div>
       </div>
     </div>
   </div>
 );
 
+// ... (FoodTab, ProfileTab, and WorkoutModal remain EXACTLY the same as the previous build) ...
 const FoodTab = ({ user, logMeal }) => {
   const [food, setFood] = useState('');
   const [protein, setProtein] = useState('');
-
   return (
-    <div className="space-y-6 animate-fade-in pb-24 md:pb-6">
+    <div className="space-y-6 animate-fade-in pb-24 pt-4 md:pb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="glass-card p-6 md:p-8 border-emerald-500/20">
           <h2 className="text-xl font-bold uppercase text-emerald-400 mb-6 flex items-center gap-2 tracking-widest border-b border-emerald-500/20 pb-2"><Pizza size={20}/> Fuel the Engine</h2>
           <form onSubmit={(e) => { e.preventDefault(); logMeal(food, protein, false); setFood(''); setProtein(''); }} className="space-y-4">
-            <div>
-              <label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Ration Description</label>
-              <input placeholder="E.g. Chicken Smash Burger" required value={food} onChange={e=>setFood(e.target.value)} className="w-full bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" />
-            </div>
-            <div>
-              <label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Protein Content</label>
-              <input type="number" placeholder="Protein (g)" required value={protein} onChange={e=>setProtein(e.target.value)} className="w-full bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" />
-            </div>
+            <div><label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Ration Description</label><input placeholder="E.g. Chicken Smash Burger" required value={food} onChange={e=>setFood(e.target.value)} className="w-full bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" /></div>
+            <div><label className="text-xs text-emerald-500/70 uppercase tracking-widest mb-1 block">Protein Content</label><input type="number" placeholder="Protein (g)" required value={protein} onChange={e=>setProtein(e.target.value)} className="w-full bg-black/50 border border-emerald-900/50 rounded p-4 text-white focus:border-emerald-500 outline-none transition" /></div>
             <button type="submit" className="w-full py-4 mt-4 bg-emerald-700 hover:bg-emerald-600 font-black uppercase tracking-widest rounded text-white transition shadow-[0_0_15px_rgba(16,185,129,0.3)]">Log Nutrition</button>
           </form>
         </div>
-
         <div className="glass-card p-6 md:p-8">
           <h3 className="text-lg font-bold text-white mb-6 uppercase tracking-widest border-b border-white/10 pb-2">Recent Rations</h3>
           <ul className="space-y-3 overflow-y-auto max-h-[400px] hide-scrollbar">
-            {(user.meals || []).map((m, i) => (
-              <li key={i} className="flex justify-between items-center bg-black/40 p-4 rounded border border-white/5 hover:border-emerald-500/30 transition">
-                <span className="text-gray-300 font-medium">{m.foodName}</span>
-                <span className="text-emerald-400 font-black tracking-wider">{m.protein}g PRO</span>
-              </li>
-            ))}
+            {(user.meals || []).map((m, i) => (<li key={i} className="flex justify-between items-center bg-black/40 p-4 rounded border border-white/5 hover:border-emerald-500/30 transition"><span className="text-gray-300 font-medium">{m.foodName}</span><span className="text-emerald-400 font-black tracking-wider">{m.protein}g PRO</span></li>))}
             {(!user.meals || user.meals.length === 0) && <p className="text-gray-600 text-sm italic">No meals logged yet.</p>}
           </ul>
         </div>
@@ -213,40 +238,25 @@ const FoodTab = ({ user, logMeal }) => {
 const ProfileTab = ({ user, updateBio }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [bioText, setBioText] = useState(user.bio);
-
   return (
-    <div className="space-y-6 animate-fade-in pb-24 md:pb-6">
+    <div className="space-y-6 animate-fade-in pb-24 pt-4 md:pb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="glass-card p-8 text-center flex flex-col items-center relative overflow-hidden">
            <div className="absolute top-0 left-0 w-full h-32 md:h-48 bg-gradient-to-b from-indigo-900/40 to-transparent"></div>
            <div className="z-10 mt-4 md:mt-12"><ImageAvatar heroName={user.heroName} size={140} /></div>
            <h2 className="text-3xl md:text-4xl font-black uppercase text-white mt-6 tracking-widest z-10">{user.username}</h2>
            <p className="text-indigo-400 font-bold mb-6 uppercase tracking-widest text-sm z-10">Level {user.level} {user.franchise} Warrior</p>
-           
            {isEditing ? (
-             <div className="w-full max-w-sm flex gap-2 z-10">
-               <input value={bioText} onChange={e=>setBioText(e.target.value)} className="flex-1 bg-black/50 border border-indigo-500/50 rounded p-3 text-white text-sm text-center outline-none" />
-               <button onClick={()=>{updateBio(bioText); setIsEditing(false);}} className="bg-indigo-600 px-6 font-bold uppercase tracking-widest rounded text-white text-xs transition hover:bg-indigo-500">Save</button>
-             </div>
-           ) : (
-             <p className="text-gray-300 italic text-sm cursor-pointer hover:text-white z-10 bg-black/30 p-4 rounded-lg border border-white/10 w-full max-w-sm transition" onClick={()=>setIsEditing(true)}>"{user.bio}" <span className="text-xs text-indigo-400 ml-2">Edit</span></p>
-           )}
+             <div className="w-full max-w-sm flex gap-2 z-10"><input value={bioText} onChange={e=>setBioText(e.target.value)} className="flex-1 bg-black/50 border border-indigo-500/50 rounded p-3 text-white text-sm text-center outline-none" /><button onClick={()=>{updateBio(bioText); setIsEditing(false);}} className="bg-indigo-600 px-6 font-bold uppercase tracking-widest rounded text-white text-xs transition hover:bg-indigo-500">Save</button></div>
+           ) : (<p className="text-gray-300 italic text-sm cursor-pointer hover:text-white z-10 bg-black/30 p-4 rounded-lg border border-white/10 w-full max-w-sm transition" onClick={()=>setIsEditing(true)}>"{user.bio}" <span className="text-xs text-indigo-400 ml-2">Edit</span></p>)}
         </div>
-
         <div className="space-y-6">
           <div className="glass-card p-6">
             <h3 className="text-lg font-bold uppercase text-emerald-400 mb-6 flex items-center gap-2 tracking-widest border-b border-white/10 pb-2"><Briefcase size={18}/> Arsenal Stash</h3>
-            {(!user.inventory || user.inventory.length === 0) ? (
-              <p className="text-sm text-gray-500 italic">Hit a PR on core lifts (bench, squat, deadlift) to unlock loot.</p>
-            ) : (
-              <ul className="space-y-3">
-                {user.inventory.map((item, i) => (
-                  <li key={i} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded"><span className="text-emerald-500"><Swords size={16}/></span><span className="text-sm text-emerald-100 font-bold tracking-wider uppercase">{item}</span></li>
-                ))}
-              </ul>
+            {(!user.inventory || user.inventory.length === 0) ? (<p className="text-sm text-gray-500 italic">Hit a PR on core lifts to unlock loot.</p>) : (
+              <ul className="space-y-3">{user.inventory.map((item, i) => (<li key={i} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded"><span className="text-emerald-500"><Swords size={16}/></span><span className="text-sm text-emerald-100 font-bold tracking-wider uppercase">{item}</span></li>))}</ul>
             )}
           </div>
-
           <div className="glass-card p-6">
             <h3 className="text-lg font-bold uppercase text-white mb-6 flex items-center gap-2 tracking-widest border-b border-white/10 pb-2">Loot Roadmap</h3>
             <div className="relative border-l-2 border-indigo-900 ml-4 space-y-8">
@@ -276,81 +286,44 @@ const ChatTab = ({ user }) => {
     
     const userText = input;
     setInput('');
-    
-    // 1. Add User Message and a "Loading" AI Message to the UI
     setMessages(prev => [...prev, { sender: 'user', text: userText }, { sender: 'ai', text: '...' }]);
 
     try {
-      // 2. Build the Persona Prompt
       const systemPrompt = `You are ${companion.name} from the ${user.franchise} universe. You are an AI companion for a fitness app. The user trains with brutal, high-intensity methodology. Keep your response to exactly one short, punchy, in-character sentence. Do not use emojis or hashtags.`;
+      const chatHistory = messages.filter(m => m.text !== '...').map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }));
 
-      // 3. Format the conversation history for the AI memory
-      const chatHistory = messages
-        .filter(m => m.text !== '...') // Remove loading dots
-        .map(m => ({
-          role: m.sender === 'user' ? 'user' : 'assistant',
-          content: m.text
-        }));
-
-      // 4. Fetch the response from Groq
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          model: "llama3-8b-8192", // Fast open-source model
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...chatHistory,
-            { role: "user", content: userText }
-          ],
-          temperature: 0.7,
-          max_tokens: 100,
-        })
+        body: JSON.stringify({ model: "llama3-8b-8192", messages: [{ role: "system", content: systemPrompt }, ...chatHistory, { role: "user", content: userText }], temperature: 0.7, max_tokens: 100 })
       });
 
-      if (!response.ok) throw new Error('Network response was not ok');
+      if (!response.ok) throw new Error('Network error');
       const data = await response.json();
-      const aiResponse = data.choices[0].message.content.replace(/"/g, ''); // Clean up quotes
+      const aiResponse = data.choices[0].message.content.replace(/"/g, ''); 
 
-      // 5. Replace the "Loading" message with the actual response
-      setMessages(prev => {
-        const newMsgs = [...prev];
-        newMsgs[newMsgs.length - 1] = { sender: 'ai', text: aiResponse };
-        return newMsgs;
-      });
-
+      setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: aiResponse }; return newMsgs; });
     } catch (error) {
-      setMessages(prev => {
-        const newMsgs = [...prev];
-        newMsgs[newMsgs.length - 1] = { sender: 'ai', text: "The comms channel is experiencing interference... check your API key." };
-        return newMsgs;
-      });
+      setMessages(prev => { const newMsgs = [...prev]; newMsgs[newMsgs.length - 1] = { sender: 'ai', text: "The comms channel is experiencing interference... check your API key." }; return newMsgs; });
     }
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] md:h-[calc(100vh-40px)] animate-fade-in glass-card overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-100px)] md:h-[calc(100vh-40px)] animate-fade-in glass-card overflow-hidden mt-4 md:mt-0">
       <div className={`p-6 border-b flex items-center gap-4 ${companion.bg} ${companion.border}`}>
         <span className="text-4xl bg-black/50 p-3 rounded-full border border-white/10">{companion.icon}</span>
-        <div>
-          <h2 className={`font-black uppercase tracking-widest text-xl ${companion.color}`}>{companion.name}</h2>
-          <p className="text-xs text-gray-400 uppercase tracking-widest mt-1">Secure Comms Channel</p>
-        </div>
+        <div><h2 className={`font-black uppercase tracking-widest text-xl ${companion.color}`}>{companion.name}</h2><p className="text-xs text-gray-400 uppercase tracking-widest mt-1">Secure Comms Channel</p></div>
       </div>
-      
       <div className="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar pb-24 md:pb-6">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] md:max-w-[60%] p-4 rounded-2xl text-sm md:text-base shadow-lg ${m.sender === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-[#1a1a1a] text-gray-200 border border-white/10 rounded-bl-none font-serif italic'}`}>
-              {m.text}
-            </div>
+            <div className={`max-w-[85%] md:max-w-[60%] p-4 rounded-2xl text-sm md:text-base shadow-lg ${m.sender === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-[#1a1a1a] text-gray-200 border border-white/10 rounded-bl-none font-serif italic'}`}>{m.text}</div>
           </div>
         ))}
       </div>
-
       <div className="p-4 bg-black/40 border-t border-white/5 absolute bottom-0 w-full md:relative md:bg-transparent">
         <form onSubmit={handleSend} className="max-w-3xl mx-auto bg-black/80 backdrop-blur-md border border-white/10 rounded-full p-2 flex gap-2 shadow-2xl">
           <input value={input} onChange={e=>setInput(e.target.value)} placeholder="Consult the AI..." className="flex-1 bg-transparent px-6 text-white text-base focus:outline-none placeholder-gray-500" />
@@ -368,84 +341,63 @@ const WorkoutModal = ({ isOpen, onClose, logWorkout }) => {
 
   if (!isOpen) return null;
 
-  const handleAddRow = () => setExercises([...exercises, { name: '', weight: '', reps: '', sets: '' }]);
-  const handleUpdateRow = (index, field, value) => {
-    const newEx = [...exercises];
-    newEx[index][field] = value;
-    setExercises(newEx);
-  };
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    logWorkout(date, split, exercises);
-    onClose();
-    setExercises([{ name: '', weight: '', reps: '', sets: '' }]);
-  };
+  const handleUpdateRow = (index, field, value) => { const newEx = [...exercises]; newEx[index][field] = value; setExercises(newEx); };
+  const handleSubmit = (e) => { e.preventDefault(); logWorkout(date, split, exercises); onClose(); setExercises([{ name: '', weight: '', reps: '', sets: '' }]); };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-fade-in">
       <div className="bg-[#0f0f0f] border border-indigo-500/30 w-full max-w-lg md:max-w-2xl rounded-xl shadow-[0_0_40px_rgba(79,70,229,0.2)] overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex justify-between items-center p-6 border-b border-white/10 bg-black/50">
-          <h2 className="text-xl md:text-2xl font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2"><Dumbbell size={24}/> Log Conquest</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition"><X size={28}/></button>
-        </div>
-        
+        <div className="flex justify-between items-center p-6 border-b border-white/10 bg-black/50"><h2 className="text-xl md:text-2xl font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2"><Dumbbell size={24}/> Log Conquest</h2><button onClick={onClose} className="text-gray-400 hover:text-white transition"><X size={28}/></button></div>
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 hide-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Date</label>
-              <input type="date" required value={date} onChange={(e)=>setDate(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Split</label>
-              <select value={split} onChange={(e)=>setSplit(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition">
-                <option>Blood & Guts (HIT)</option>
-                <option>Push/Pull/Legs</option>
-                <option>Upper/Lower</option>
-                <option>Full Body</option>
-              </select>
-            </div>
+            <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Date</label><input type="date" required value={date} onChange={(e)=>setDate(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition" /></div>
+            <div><label className="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Split</label><select value={split} onChange={(e)=>setSplit(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded p-4 text-white focus:border-indigo-500 outline-none transition"><option>Blood & Guts (HIT)</option><option>Push/Pull/Legs</option><option>Upper/Lower</option><option>Full Body</option></select></div>
           </div>
-
           <div className="space-y-4">
-            <label className="text-xs text-gray-400 uppercase tracking-widest block">Exercises (e.g. bench, squat)</label>
+            <label className="text-xs text-gray-400 uppercase tracking-widest block">Exercises</label>
             {exercises.map((ex, i) => (
               <div key={i} className="flex flex-col md:flex-row gap-2 items-center bg-white/5 md:bg-transparent p-3 md:p-0 rounded-lg">
                 <input placeholder="Movement" required value={ex.name} onChange={(e)=>handleUpdateRow(i, 'name', e.target.value)} className="w-full md:flex-2 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" />
-                <div className="w-full flex gap-2">
-                  <input type="number" placeholder="Kg" required value={ex.weight} onChange={(e)=>handleUpdateRow(i, 'weight', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" />
-                  <input type="number" placeholder="Reps" required value={ex.reps} onChange={(e)=>handleUpdateRow(i, 'reps', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" />
-                  <input type="number" placeholder="Sets" required value={ex.sets} onChange={(e)=>handleUpdateRow(i, 'sets', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" />
-                </div>
+                <div className="w-full flex gap-2"><input type="number" placeholder="Kg" required value={ex.weight} onChange={(e)=>handleUpdateRow(i, 'weight', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" /><input type="number" placeholder="Reps" required value={ex.reps} onChange={(e)=>handleUpdateRow(i, 'reps', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" /><input type="number" placeholder="Sets" required value={ex.sets} onChange={(e)=>handleUpdateRow(i, 'sets', e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded p-3 text-white focus:border-indigo-500 outline-none" /></div>
               </div>
             ))}
-            <button type="button" onClick={handleAddRow} className="text-sm font-bold uppercase tracking-widest text-indigo-400 flex items-center justify-center gap-2 hover:text-indigo-300 mt-4 bg-indigo-900/30 w-full md:w-auto px-6 py-3 rounded-lg transition"><Plus size={16}/> Add Movement</button>
+            <button type="button" onClick={()=>setExercises([...exercises, { name: '', weight: '', reps: '', sets: '' }])} className="text-sm font-bold uppercase tracking-widest text-indigo-400 flex items-center justify-center gap-2 hover:text-indigo-300 mt-4 bg-indigo-900/30 w-full md:w-auto px-6 py-3 rounded-lg transition"><Plus size={16}/> Add Movement</button>
           </div>
         </form>
-
-        <div className="p-6 border-t border-white/10 bg-black/50">
-          <button onClick={handleSubmit} className="w-full py-4 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition shadow-[0_0_15px_rgba(79,70,229,0.4)]">Commit to Iron</button>
-        </div>
+        <div className="p-6 border-t border-white/10 bg-black/50"><button onClick={handleSubmit} className="w-full py-4 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition shadow-[0_0_15px_rgba(79,70,229,0.4)]">Commit to Iron</button></div>
       </div>
     </div>
   );
 };
 
+// --- 5. AUTHENTICATION UI (NOW ASYNC) ---
 const DndLogin = ({ engine }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [heroName, setHeroName] = useState('Vito');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleAuth = (e) => {
+  const handleAuth = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    
+    let res;
     if (isRegistering) {
-      if (engine.registry.find(u => u.username === username)) return setError("Name already taken.");
-      engine.registerUser(username, password, heroName, HEROES[heroName].franchise);
+      res = await engine.registerUser(username, password, heroName, HEROES[heroName].franchise);
     } else {
-      if (!engine.loginUser(username, password)) setError("Incorrect credentials.");
+      res = await engine.loginUser(username, password);
     }
+    
+    if (!res.success) setError(res.error);
+    setIsLoading(false);
   };
+
+  if (engine.isDbLoading) {
+    return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="animate-spin text-amber-500" size={48} /></div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 bg-[url('https://www.transparenttextures.com/patterns/dark-leather.png')]">
@@ -471,20 +423,17 @@ const DndLogin = ({ engine }) => {
             </div>
           )}
           
-          <button type="submit" className="w-full py-4 mt-6 bg-gradient-to-r from-amber-800 to-amber-600 text-black font-black uppercase tracking-widest hover:from-amber-700 hover:to-amber-500 transition rounded-lg shadow-[0_0_15px_rgba(217,119,6,0.4)] md:text-lg">
-            {isRegistering ? 'Forge Legacy' : 'Enter Realm'}
+          <button type="submit" disabled={isLoading} className="w-full py-4 mt-6 bg-gradient-to-r from-amber-800 to-amber-600 text-black font-black uppercase tracking-widest hover:from-amber-700 hover:to-amber-500 transition rounded-lg shadow-[0_0_15px_rgba(217,119,6,0.4)] md:text-lg flex justify-center items-center gap-2 disabled:opacity-50">
+            {isLoading ? <Loader2 className="animate-spin" size={20}/> : (isRegistering ? 'Forge Legacy' : 'Enter Realm')}
           </button>
         </form>
-        
-        <button onClick={() => { setIsRegistering(!isRegistering); setError(''); }} className="mt-8 text-amber-700 hover:text-amber-500 text-sm underline font-serif transition">
-          {isRegistering ? 'Already in the family? Login.' : 'New to town? Register.'}
-        </button>
+        <button onClick={() => { setIsRegistering(!isRegistering); setError(''); }} className="mt-8 text-amber-700 hover:text-amber-500 text-sm underline font-serif transition">{isRegistering ? 'Already in the family? Login.' : 'New to town? Register.'}</button>
       </div>
     </div>
   );
 };
 
-// --- 4. ROOT APP ---
+// --- 6. ROOT APP ---
 export default function App() {
   const engine = useHero();
   const [activeTab, setActiveTab] = useState('home');
@@ -494,61 +443,33 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-gray-100 font-sans flex overflow-hidden">
-      <style>{`
-        .glass-card { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
-        .animate-slide-down { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      `}</style>
+      <style>{`.glass-card { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; } .hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; } @keyframes fadeIn { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } } @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } } .animate-slide-down { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }`}</style>
 
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col w-64 border-r border-white/10 bg-[#0a0a0a] z-40 p-4">
-        <div className="flex items-center gap-3 mb-10 px-2 mt-4">
-           <Crown className="text-amber-500" size={28}/>
-           <h1 className="font-serif font-black text-xl tracking-widest text-amber-500">SYNDICATE</h1>
-        </div>
-        
+        <div className="flex items-center gap-3 mb-10 px-2 mt-4"><Crown className="text-amber-500" size={28}/><h1 className="font-serif font-black text-xl tracking-widest text-amber-500">SYNDICATE</h1></div>
         <nav className="flex-1 space-y-4">
-          <button onClick={() => setActiveTab('home')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${activeTab === 'home' ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
-            <Home size={20} /> <span className="font-bold uppercase tracking-widest text-sm">Base</span>
-          </button>
-          <button onClick={() => setActiveTab('food')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${activeTab === 'food' ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
-            <Pizza size={20} /> <span className="font-bold uppercase tracking-widest text-sm">Fuel</span>
-          </button>
-          <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${activeTab === 'chat' ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
-            <MessageSquare size={20} /> <span className="font-bold uppercase tracking-widest text-sm">Comms</span>
-          </button>
-          <button onClick={() => setActiveTab('profile')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${activeTab === 'profile' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
-            <User size={20} /> <span className="font-bold uppercase tracking-widest text-sm">Profile</span>
-          </button>
+          <button onClick={() => setActiveTab('home')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${activeTab === 'home' ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}><Home size={20} /> <span className="font-bold uppercase tracking-widest text-sm">Base</span></button>
+          <button onClick={() => setActiveTab('food')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${activeTab === 'food' ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}><Pizza size={20} /> <span className="font-bold uppercase tracking-widest text-sm">Fuel</span></button>
+          <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${activeTab === 'chat' ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}><MessageSquare size={20} /> <span className="font-bold uppercase tracking-widest text-sm">Comms</span></button>
+          <button onClick={() => setActiveTab('profile')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${activeTab === 'profile' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}><User size={20} /> <span className="font-bold uppercase tracking-widest text-sm">Profile</span></button>
         </nav>
-
-        <button onClick={() => setIsWorkoutModalOpen(true)} className="w-full flex items-center justify-center gap-3 bg-indigo-600 text-white p-4 rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:bg-indigo-500 transition transform hover:scale-105">
-           <Dumbbell size={20} /> <span className="font-black uppercase tracking-widest">Log Grind</span>
-        </button>
+        <button onClick={() => setIsWorkoutModalOpen(true)} className="w-full flex items-center justify-center gap-3 bg-indigo-600 text-white p-4 rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:bg-indigo-500 transition transform hover:scale-105"><Dumbbell size={20} /> <span className="font-black uppercase tracking-widest">Log Grind</span></button>
       </aside>
 
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 relative overflow-y-auto hide-scrollbar">
         <div className="w-full max-w-md md:max-w-6xl mx-auto h-full px-4 md:px-8 py-4 md:py-8">
-          {activeTab === 'home' && <DashboardTab user={engine.currentUser} />}
+          {activeTab === 'home' && <DashboardTab user={engine.currentUser} registry={engine.registry} />}
           {activeTab === 'food' && <FoodTab user={engine.currentUser} logMeal={engine.logMeal} />}
           {activeTab === 'chat' && <ChatTab user={engine.currentUser} />}
           {activeTab === 'profile' && <ProfileTab user={engine.currentUser} updateBio={engine.updateBio} />}
         </div>
       </main>
 
-      {/* GLOBAL NOTIFICATIONS & MODALS */}
+      {/* GLOBAL NOTIFICATIONS */}
       {engine.aiPopup && (
-        <div className="fixed top-6 left-1/2 z-50 animate-slide-down w-[90%] max-w-sm md:max-w-md">
-          <div className="p-4 md:p-6 border border-indigo-500/50 bg-indigo-950/95 backdrop-blur-xl shadow-[0_0_40px_rgba(79,70,229,0.5)] flex items-center gap-4 rounded-2xl">
-             <span className="text-3xl md:text-4xl drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">✨</span>
-             <p className="text-indigo-100 font-serif italic text-sm md:text-base">"{engine.aiPopup.message}"</p>
-          </div>
-        </div>
+        <div className="fixed top-6 left-1/2 z-50 animate-slide-down w-[90%] max-w-sm md:max-w-md"><div className="p-4 md:p-6 border border-indigo-500/50 bg-indigo-950/95 backdrop-blur-xl shadow-[0_0_40px_rgba(79,70,229,0.5)] flex items-center gap-4 rounded-2xl"><span className="text-3xl md:text-4xl drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">✨</span><p className="text-indigo-100 font-serif italic text-sm md:text-base">"{engine.aiPopup.message}"</p></div></div>
       )}
 
       <WorkoutModal isOpen={isWorkoutModalOpen} onClose={() => setIsWorkoutModalOpen(false)} logWorkout={engine.logFullWorkout} />
@@ -556,17 +477,11 @@ export default function App() {
       {/* MOBILE BOTTOM NAVIGATION */}
       <nav className="md:hidden fixed bottom-0 w-full bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/5 z-40 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] pb-safe">
         <div className="flex justify-around items-center px-2 py-4 relative">
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-16 transition-colors ${activeTab === 'home' ? 'text-white' : 'text-gray-600'}`}><Home size={22} /><span className="text-[9px] mt-1.5 uppercase font-black tracking-widest">Base</span></button>
-          <button onClick={() => setActiveTab('food')} className={`flex flex-col items-center w-16 transition-colors ${activeTab === 'food' ? 'text-white' : 'text-gray-600'}`}><Pizza size={22} /><span className="text-[9px] mt-1.5 uppercase font-black tracking-widest">Fuel</span></button>
-          
-          <div className="relative w-16 flex justify-center">
-            <button onClick={() => setIsWorkoutModalOpen(true)} className="absolute -top-10 bg-indigo-600 text-white p-4 rounded-full shadow-[0_0_25px_rgba(79,70,229,0.6)] border-4 border-[#050505]">
-               <Dumbbell size={26} />
-            </button>
-          </div>
-          
-          <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center w-16 transition-colors ${activeTab === 'chat' ? 'text-white' : 'text-gray-600'}`}><MessageSquare size={22} /><span className="text-[9px] mt-1.5 uppercase font-black tracking-widest">Comms</span></button>
-          <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center w-16 transition-colors ${activeTab === 'profile' ? 'text-white' : 'text-gray-600'}`}><User size={22} /><span className="text-[9px] mt-1.5 uppercase font-black tracking-widest">Profile</span></button>
+          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-16 transition-colors ${activeTab === 'home' ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}><Home size={22} /><span className="text-[9px] mt-1.5 uppercase font-black tracking-widest">Base</span></button>
+          <button onClick={() => setActiveTab('food')} className={`flex flex-col items-center w-16 transition-colors ${activeTab === 'food' ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}><Pizza size={22} /><span className="text-[9px] mt-1.5 uppercase font-black tracking-widest">Fuel</span></button>
+          <div className="relative w-16 flex justify-center"><button onClick={() => setIsWorkoutModalOpen(true)} className="absolute -top-10 bg-indigo-600 text-white p-4 rounded-full shadow-[0_0_25px_rgba(79,70,229,0.6)] border-4 border-[#050505] hover:scale-110 hover:bg-indigo-500 transition-all transform duration-300"><Dumbbell size={26} /></button></div>
+          <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center w-16 transition-colors ${activeTab === 'chat' ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}><MessageSquare size={22} /><span className="text-[9px] mt-1.5 uppercase font-black tracking-widest">Comms</span></button>
+          <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center w-16 transition-colors ${activeTab === 'profile' ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}><User size={22} /><span className="text-[9px] mt-1.5 uppercase font-black tracking-widest">Profile</span></button>
         </div>
       </nav>
     </div>
