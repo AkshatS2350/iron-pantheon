@@ -17,7 +17,7 @@ import vitoImg from './assets/vito-hero.png';
 import michaelImg from './assets/michael-hero.png';
 import tommyImg from './assets/tommy-hero.png';
 
-// --- 2. LORE DATA & AVATARS ---
+// --- 2. LORE DATA & AUDIO ENGINE ---
 const HEROES = {
   Kratos: { franchise: 'God of War', image: kratosImg, glow: 'rgba(220,38,38,0.6)' }, 
   Batman: { franchise: 'DC', image: batmanImg, glow: 'rgba(250,204,21,0.6)' }, 
@@ -37,18 +37,42 @@ const COMPANIONS = {
   'Vice City': { name: 'Ken Rosenberg', icon: '🌴', color: 'text-pink-400', bg: 'bg-pink-950/40', border: 'border-pink-500/50' }
 };
 
-const LOOT_ROADMAP = [
-  { level: 1, item: 'Innate Might (Fists)' },
-  { level: 5, item: 'Franchise Weapon' },
-  { level: 10, item: 'Divine Artifact' }
-];
-
+const LOOT_ROADMAP = [ { level: 1, item: 'Innate Might (Fists)' }, { level: 5, item: 'Franchise Weapon' }, { level: 10, item: 'Divine Artifact' } ];
 const LOOT_TABLE = {
   'God of War': { 'bench': 'Leviathan Axe', 'squat': 'Blades of Chaos', 'deadlift': 'Draupnir Spear' },
   'DC': { 'bench': 'Batarang Arsenal', 'squat': 'Kryptonite Ring', 'deadlift': 'Lasso of Truth' },
   'Marvel': { 'bench': 'Vibranium Shield', 'squat': 'Mjolnir', 'deadlift': 'Infinity Gauntlet' },
   'Godfather': { 'bench': 'Tommy Gun', 'squat': 'Bespoke Silk Suit', 'deadlift': 'The Don\'s Ring' },
   'Vice City': { 'bench': 'Machete', 'squat': 'Chainsaw', 'deadlift': 'Vercetti Estate Keys' }
+};
+
+// Web Audio API to synthesize sounds on the fly (No downloads needed)
+const playWorkoutFX = (franchise) => {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  if (franchise === 'Godfather' || franchise === 'Vice City') {
+    // Subtle, sharp mafia flick/coin sound
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1500, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(3000, audioCtx.currentTime + 0.1);
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+  } else {
+    // Cinematic, heavy hero Bass Drop/Boom
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.6);
+    gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.7);
+  }
 };
 
 const ImageAvatar = ({ heroName, size = 80 }) => {
@@ -60,20 +84,17 @@ const ImageAvatar = ({ heroName, size = 80 }) => {
   );
 };
 
-// --- 3. CLOUD GAME ENGINE (SUPABASE) ---
+// --- 3. CLOUD GAME ENGINE ---
 const useHero = () => {
   const [registry, setRegistry] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [aiPopup, setAiPopup] = useState(null);
   const [isDbLoading, setIsDbLoading] = useState(true);
+  const [isScreenShaking, setIsScreenShaking] = useState(false); // New FX State
 
-  // Fetch Leaderboard on mount
   const fetchLeaderboard = async () => {
-    const { data, error } = await supabase.from('syndicate_registry').select('username, hero_data');
-    if (data) {
-      const mapped = data.map(d => ({ username: d.username, ...d.hero_data }));
-      setRegistry(mapped);
-    }
+    const { data } = await supabase.from('syndicate_registry').select('username, hero_data');
+    if (data) setRegistry(data.map(d => ({ username: d.username, ...d.hero_data })));
     setIsDbLoading(false);
   };
 
@@ -86,27 +107,18 @@ const useHero = () => {
 
   const loginUser = async (username, password) => {
     const { data, error } = await supabase.from('syndicate_registry').select('*').eq('username', username).single();
-    
     if (error || !data) return { success: false, error: "Identity not found in the realm." };
     if (data.password !== password) return { success: false, error: "Incorrect passcode." };
-    
     setCurrentUser({ username: data.username, ...data.hero_data });
     return { success: true };
   };
 
   const registerUser = async (username, password, heroName, franchise) => {
-    // Check if exists
     const { data: existing } = await supabase.from('syndicate_registry').select('username').eq('username', username).single();
     if (existing) return { success: false, error: "Alias already claimed." };
 
     const newHeroData = { heroName, franchise, xp: 0, level: 1, prs: {}, inventory: [], bio: "A new legend begins.", workouts: [], meals: [], cheatMeals: [] };
-    
-    const { error } = await supabase.from('syndicate_registry').insert([{ 
-      username, 
-      password, 
-      hero_data: newHeroData 
-    }]);
-
+    const { error } = await supabase.from('syndicate_registry').insert([{ username, password, hero_data: newHeroData }]);
     if (error) return { success: false, error: "The database rejected your entry." };
     
     setCurrentUser({ username, ...newHeroData });
@@ -116,13 +128,10 @@ const useHero = () => {
 
   const updateUserState = async (updates) => {
     const updatedUser = { ...currentUser, ...updates };
-    setCurrentUser(updatedUser); // Optimistic UI update
-
-    // Extract just the hero_data payload
+    setCurrentUser(updatedUser); 
     const { username, ...hero_data } = updatedUser;
-
     await supabase.from('syndicate_registry').update({ hero_data }).eq('username', username);
-    fetchLeaderboard(); // Refresh leaderboard
+    fetchLeaderboard(); 
   };
 
   const logFullWorkout = (date, split, exercises) => {
@@ -134,7 +143,6 @@ const useHero = () => {
     exercises.forEach(ex => {
       const xp = (ex.weight * ex.reps * ex.sets) / 10;
       totalXpGained += xp;
-      
       const prevWeight = newPrs[ex.name] || 0;
       if (ex.weight > prevWeight) {
         newPrs[ex.name] = ex.weight;
@@ -153,6 +161,11 @@ const useHero = () => {
     
     updateUserState({ xp: newXp, level: newLevel, prs: newPrs, inventory: newInventory, workouts: [newWorkoutLog, ...(currentUser.workouts || [])] });
     
+    // TRIGGER SCREEN SHAKE AND AUDIO
+    playWorkoutFX(currentUser.franchise);
+    setIsScreenShaking(true);
+    setTimeout(() => setIsScreenShaking(false), 500);
+
     let popupMsg = `The conquest advances! +${totalXpGained.toFixed(0)} XP.`;
     if (unlockedItems.length > 0) popupMsg = `Magnificent! You unlocked the ${unlockedItems.join(', ')}!`;
     triggerAiPopup(currentUser.franchise, popupMsg);
@@ -165,50 +178,62 @@ const useHero = () => {
   };
 
   const updateBio = (newBio) => updateUserState({ bio: newBio });
-  const logout = () => setCurrentUser(null);
-
-  return { currentUser, registry, isDbLoading, loginUser, registerUser, logFullWorkout, logMeal, updateBio, aiPopup, logout };
+  return { currentUser, registry, isDbLoading, loginUser, registerUser, logFullWorkout, logMeal, updateBio, aiPopup, isScreenShaking };
 };
 
 // --- 4. UI COMPONENTS ---
 
-const DashboardTab = ({ user, registry }) => (
-  <div className="space-y-6 animate-fade-in pb-24 md:pb-6 pt-4">
-    <div className="glass-card p-6 md:p-8 flex items-center justify-between">
-      <div>
-        <h2 className="text-3xl md:text-5xl font-black uppercase text-white tracking-widest">{user.username}</h2>
-        <p className="text-indigo-400 font-bold text-sm md:text-lg tracking-widest uppercase mt-2">Level {user.level} • {Math.floor(user.xp)} XP</p>
-      </div>
-      <ImageAvatar heroName={user.heroName} size={80} />
-    </div>
+const DashboardTab = ({ user, registry }) => {
+  // Generate the exact dates for the last 14 days
+  const today = new Date();
+  const last14Days = Array.from({length: 14}).map((_, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (13 - i));
+    return d.toISOString().split('T')[0];
+  });
 
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="glass-card p-6">
-        <h3 className="text-lg font-bold uppercase text-white mb-4 flex items-center gap-2 tracking-widest border-b border-white/10 pb-2"><CalIcon size={18} className="text-indigo-400"/> Conquest Calendar</h3>
-        <div className="grid grid-cols-7 gap-2">
-          {Array.from({length: 14}).map((_, i) => (
-             <div key={i} className={`h-8 md:h-12 rounded ${i % 3 === 0 ? 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'bg-white/5 border border-white/10'}`}></div>
-          ))}
+  return (
+    <div className="space-y-6 animate-fade-in pb-24 md:pb-6 pt-4">
+      <div className="glass-card p-6 md:p-8 flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl md:text-5xl font-black uppercase text-white tracking-widest">{user.username}</h2>
+          <p className="text-indigo-400 font-bold text-sm md:text-lg tracking-widest uppercase mt-2">Level {user.level} • {Math.floor(user.xp)} XP</p>
         </div>
-        <p className="text-xs text-gray-500 mt-4 text-center uppercase tracking-widest">Consistency Matrix (14 Days)</p>
+        <ImageAvatar heroName={user.heroName} size={80} />
       </div>
 
-      <div className="glass-card p-6 flex flex-col">
-         <h2 className="text-lg font-bold uppercase text-yellow-500 flex gap-2 border-b border-white/10 pb-2 mb-4"><Crown size={20} /> Global Leaderboard</h2>
-         <div className="space-y-2 overflow-y-auto max-h-[200px] hide-scrollbar">
-           {[...registry].sort((a, b) => b.xp - a.xp).map((u, index) => (
-             <div key={u.username} className={`flex justify-between p-3 rounded ${u.username === user.username ? 'bg-white/10 border border-white/20' : 'bg-black/30'}`}>
-               <p className="font-bold text-white">#{index + 1} {u.username} <span className="text-xs text-gray-400">({u.heroName})</span></p>
-               <p className="font-bold text-indigo-400">{Math.floor(u.xp)} XP</p>
-             </div>
-           ))}
-         </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="glass-card p-6">
+          <h3 className="text-lg font-bold uppercase text-white mb-4 flex items-center gap-2 tracking-widest border-b border-white/10 pb-2"><CalIcon size={18} className="text-indigo-400"/> Conquest Calendar</h3>
+          <div className="grid grid-cols-7 gap-2">
+            {last14Days.map(dateStr => {
+              // Check if user has a workout on this specific date
+              const hasWorkout = user.workouts?.some(w => w.date === dateStr);
+              return (
+                <div key={dateStr} title={dateStr} className={`h-8 md:h-12 rounded transition-all duration-500 ${hasWorkout ? 'bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.6)] border border-indigo-400' : 'bg-black/40 border border-white/5'}`}></div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-500 mt-4 text-center uppercase tracking-widest">Consistency Matrix (14 Days)</p>
+        </div>
+
+        <div className="glass-card p-6 flex flex-col">
+           <h2 className="text-lg font-bold uppercase text-yellow-500 flex gap-2 border-b border-white/10 pb-2 mb-4"><Crown size={20} /> Global Leaderboard</h2>
+           <div className="space-y-2 overflow-y-auto max-h-[200px] hide-scrollbar">
+             {[...registry].sort((a, b) => b.xp - a.xp).map((u, index) => (
+               <div key={u.username} className={`flex justify-between p-3 rounded ${u.username === user.username ? 'bg-white/10 border border-white/20' : 'bg-black/30'}`}>
+                 <p className="font-bold text-white">#{index + 1} {u.username} <span className="text-xs text-gray-400">({u.heroName})</span></p>
+                 <p className="font-bold text-indigo-400">{Math.floor(u.xp)} XP</p>
+               </div>
+             ))}
+           </div>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
-// ... (FoodTab, ProfileTab, and WorkoutModal remain EXACTLY the same as the previous build) ...
+// ... FoodTab, ProfileTab, and WorkoutModal remain EXACTLY the same ...
 const FoodTab = ({ user, logMeal }) => {
   const [food, setFood] = useState('');
   const [protein, setProtein] = useState('');
@@ -370,7 +395,7 @@ const WorkoutModal = ({ isOpen, onClose, logWorkout }) => {
   );
 };
 
-// --- 5. AUTHENTICATION UI (NOW ASYNC) ---
+// --- 5. AUTHENTICATION UI ---
 const DndLogin = ({ engine }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
@@ -383,21 +408,12 @@ const DndLogin = ({ engine }) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    
-    let res;
-    if (isRegistering) {
-      res = await engine.registerUser(username, password, heroName, HEROES[heroName].franchise);
-    } else {
-      res = await engine.loginUser(username, password);
-    }
-    
+    let res = isRegistering ? await engine.registerUser(username, password, heroName, HEROES[heroName].franchise) : await engine.loginUser(username, password);
     if (!res.success) setError(res.error);
     setIsLoading(false);
   };
 
-  if (engine.isDbLoading) {
-    return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="animate-spin text-amber-500" size={48} /></div>;
-  }
+  if (engine.isDbLoading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="animate-spin text-amber-500" size={48} /></div>;
 
   return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 bg-[url('https://www.transparenttextures.com/patterns/dark-leather.png')]">
@@ -406,13 +422,10 @@ const DndLogin = ({ engine }) => {
         <Scroll size={56} className="mx-auto text-amber-600 mb-6 drop-shadow-[0_0_10px_rgba(217,119,6,0.8)]" />
         <h1 className="text-3xl md:text-4xl font-black uppercase tracking-widest text-amber-500 mb-2 font-serif">The Syndicate</h1>
         <p className="text-amber-900/80 font-serif italic mb-8 md:text-lg">Swear your blood oath.</p>
-        
         {error && <p className="text-red-500 text-sm mb-4 font-bold animate-pulse">{error}</p>}
-        
         <form onSubmit={handleAuth} className="space-y-4">
           <input type="text" required placeholder="Alias (Username)" className="w-full bg-black/60 border border-amber-900/50 p-4 text-amber-100 rounded-lg outline-none focus:border-amber-500 transition" onChange={(e) => setUsername(e.target.value)} />
           <input type="password" required placeholder="Passcode" className="w-full bg-black/60 border border-amber-900/50 p-4 text-amber-100 rounded-lg outline-none focus:border-amber-500 transition" onChange={(e) => setPassword(e.target.value)} />
-          
           {isRegistering && (
             <div className="pt-4 text-left">
               <label className="block text-amber-700 text-xs font-black uppercase tracking-widest mb-3">Select Identity</label>
@@ -422,7 +435,6 @@ const DndLogin = ({ engine }) => {
               <div className="flex justify-center mt-6 p-6 border border-amber-900/30 bg-black/40 rounded-xl"><ImageAvatar heroName={heroName} size={100} /></div>
             </div>
           )}
-          
           <button type="submit" disabled={isLoading} className="w-full py-4 mt-6 bg-gradient-to-r from-amber-800 to-amber-600 text-black font-black uppercase tracking-widest hover:from-amber-700 hover:to-amber-500 transition rounded-lg shadow-[0_0_15px_rgba(217,119,6,0.4)] md:text-lg flex justify-center items-center gap-2 disabled:opacity-50">
             {isLoading ? <Loader2 className="animate-spin" size={20}/> : (isRegistering ? 'Forge Legacy' : 'Enter Realm')}
           </button>
@@ -442,8 +454,27 @@ export default function App() {
   if (!engine.currentUser) return <DndLogin engine={engine} />;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-gray-100 font-sans flex overflow-hidden">
-      <style>{`.glass-card { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; } .hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; } @keyframes fadeIn { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } } @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } } .animate-slide-down { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }`}</style>
+    // NOTE: Added the dynamic `animate-shake` class and a red flash if `engine.isScreenShaking` is true
+    <div className={`min-h-screen ${engine.isScreenShaking ? 'bg-red-950/40 animate-shake' : 'bg-[#050505]'} text-gray-100 font-sans flex overflow-hidden transition-colors duration-100`}>
+      <style>{`
+        .glass-card { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; } 
+        .hide-scrollbar::-webkit-scrollbar { display: none; } 
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } 
+        .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; } 
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } } 
+        @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } } 
+        .animate-slide-down { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        /* The Earthquake / Camera Shake Animation */
+        @keyframes shake { 
+          0%, 100% { transform: translate(0, 0) rotate(0deg); } 
+          20% { transform: translate(-4px, 4px) rotate(-1deg); } 
+          40% { transform: translate(4px, -4px) rotate(1deg); } 
+          60% { transform: translate(-4px, -4px) rotate(-1deg); } 
+          80% { transform: translate(4px, 4px) rotate(1deg); } 
+        } 
+        .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+      `}</style>
 
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col w-64 border-r border-white/10 bg-[#0a0a0a] z-40 p-4">
